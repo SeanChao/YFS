@@ -4,11 +4,12 @@
 #define inode_h
 
 #include <stdint.h>
-#include "extent_protocol.h" // TODO: delete it
 
-#define DISK_SIZE  1024*1024*16
+#include "extent_protocol.h"  // TODO: delete it
+
+#define DISK_SIZE  1024 * 1024 * 16
 #define BLOCK_SIZE 512
-#define BLOCK_NUM  (DISK_SIZE/BLOCK_SIZE)
+#define BLOCK_NUM  (DISK_SIZE / BLOCK_SIZE)
 
 typedef uint32_t blockid_t;
 
@@ -35,7 +36,10 @@ typedef struct superblock {
 class block_manager {
  private:
   disk *d;
-  std::map <uint32_t, int> using_blocks;
+  std::map<uint32_t, int>
+      using_blocks;  // for block manager itself, for inode layer it should look
+                     // for the real block
+
  public:
   block_manager();
   struct superblock sb;
@@ -48,24 +52,30 @@ class block_manager {
 
 // inode layer -----------------------------------------
 
-#define INODE_NUM  1024
+#define INODE_NUM 1024
 
 // Inodes per block.
-#define IPB           1
+#define IPB 1
 //(BLOCK_SIZE / sizeof(struct inode))
 
 // Block containing inode i
-#define IBLOCK(i, nblocks)     ((nblocks)/BPB + (i)/IPB + 3)
+#define IBLOCK(i, nblocks) ((nblocks) / BPB + (i) / IPB + 3)
 
-// Bitmap bits per block
-#define BPB           (BLOCK_SIZE*8)
+// Bitmap bits per block (number of bits in a block, indicating how much the
+// number of block state that can be hold in one block)
+#define BPB (BLOCK_SIZE * 8)
 
 // Block containing bit for block b
-#define BBLOCK(b) ((b)/BPB + 2)
+#define BBLOCK(b) ((b) / BPB + 2)
 
+// Number of direct blocks
 #define NDIRECT 100
+// Number of doubly-indirect blocks
 #define NINDIRECT (BLOCK_SIZE / sizeof(uint))
+// Max number of blocks that a file can have
 #define MAXFILE (NDIRECT + NINDIRECT)
+
+#define NBLK(size) ((int)ceil(size / (double)BLOCK_SIZE))
 
 typedef struct inode {
   short type;
@@ -73,13 +83,13 @@ typedef struct inode {
   unsigned int atime;
   unsigned int mtime;
   unsigned int ctime;
-  blockid_t blocks[NDIRECT+1];   // Data block addresses
+  blockid_t blocks[NDIRECT + 1];  // Data block addresses
 } inode_t;
 
 class inode_manager {
  private:
   block_manager *bm;
-  struct inode* get_inode(uint32_t inum);
+  struct inode *get_inode(uint32_t inum);
   void put_inode(uint32_t inum, struct inode *ino);
 
  public:
@@ -93,4 +103,3 @@ class inode_manager {
 };
 
 #endif
-
