@@ -1,0 +1,13 @@
+*.o
+*.d
+
+part1_tester
+yfs_client
+
+.devcontainer
+.vscode
+
+# log and build files
+yfs_client1.log
+fuseout.log
+yfs1
