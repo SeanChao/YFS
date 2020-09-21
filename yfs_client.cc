@@ -189,10 +189,9 @@ int yfs_client::mkdir(inum parent, const char *name, mode_t mode,
     if (ec->create(extent_protocol::T_DIR, ino_out) != OK) {
         return IOERR;
     }
-    // TODO: modify the parent info
     // Add an entry to parent
     buf.append(to_str(std::string(name), ino_out));
-    ec->put(ino_out, buf);
+    ec->put(parent, buf);
     return r;
 }
 
@@ -225,6 +224,7 @@ int yfs_client::lookup(inum parent, const char *name, bool &found,
 }
 
 int yfs_client::readdir(inum dir, std::list<dirent> &list) {
+    std::cout << "[YC] [READDIR] " << dir << "\n";
     int r = OK;
 
     /*
@@ -270,7 +270,7 @@ int yfs_client::read(inum ino, size_t size, off_t off, std::string &data) {
     std::string buf;
     r = ec->get(ino, buf);
     std::cout << "\tget OK\n";
-    if (off >= buf.size())
+    if (off >= (long)buf.size())
         data = "";
     else
         data = buf.substr(off, size);
@@ -293,7 +293,7 @@ int yfs_client::write(inum ino, size_t size, off_t off, const char *data,
     r = ec->get(ino, buf);
     std::cout << "origin size " << buf.size() << " original content:\n";
     //   << buf << "|||\n";
-    if (off > buf.size()) {
+    if (off > (long)buf.size()) {
         std::string new_data = std::string(off - buf.size(), '\0') +
                                std::string(data).substr(0, size);
         buf = buf + new_data;
@@ -328,6 +328,23 @@ int yfs_client::unlink(inum parent, const char *name) {
      * and update the parent directory content.
      */
 
+    if (!isdir(parent)) return IOERR;
+    std::list<dirent> flist;
+    readdir(parent, flist);
+    for (std::list<dirent>::iterator i = flist.begin(); i != flist.end(); i++) {
+        if (i->name.compare(name) == 0) {
+            flist.erase(i);
+            std::string buf;
+            ec->remove(i->inum);
+            for (std::list<dirent>::iterator i = flist.begin();
+                 i != flist.end(); i++) {
+                buf.append(to_str(i->name, i->inum));
+            }
+            ec->put(parent, buf);
+            return OK;
+        }
+    }
+    r = NOENT;
     return r;
 }
 

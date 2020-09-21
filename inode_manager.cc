@@ -3,6 +3,7 @@
 #include <math.h>
 
 #include <cstring>
+#include <ctime>
 
 // disk layer -----------------------------------------
 
@@ -111,6 +112,10 @@ uint32_t inode_manager::alloc_inode(uint32_t type) {
             inode_t ino;
             ino.type = type;
             ino.size = 0;
+            std::time_t time = std::time(NULL);
+            ino.ctime = time;
+            ino.atime = time;
+            ino.mtime = time;
             put_inode(i, &ino);
             return i;
         }
@@ -204,6 +209,10 @@ void inode_manager::read_file(uint32_t inum, char **buf_out, int *size) {
         bm->read_block(bid, tmp + block_idx * BLOCK_SIZE);
     }
     *buf_out = tmp;
+    // udpate metadata
+    std::time_t time = std::time(NULL);
+    ino->atime = (unsigned int)time;
+    put_inode(inum, ino);
     return;
 }
 
@@ -247,30 +256,22 @@ void inode_manager::write_file(uint32_t inum, const char *buf, int size) {
             }
         }
     }
-    char *cmp_buf = (char *)calloc(sizeof(char), new_blk_num * BLOCK_SIZE);
     // TODO: free blocks
     // Write new file data
     int block_idx;
     for (block_idx = 0; block_idx < new_blk_num; block_idx++) {
         blockid_t bid = get_inode_block(ino, block_idx);
         bm->write_block(bid, buf + block_idx * BLOCK_SIZE);
-        memcpy(cmp_buf + block_idx * BLOCK_SIZE, buf + block_idx * BLOCK_SIZE,
-               BLOCK_SIZE);
     }
     // update metadata
     ino->size = size;
+    std::time_t time = std::time(NULL);
+    ino->atime = time;
+    ino->mtime = time;
+    ino->ctime = time;
+
     // write back inode
     put_inode(inum, ino);
-    // Assert
-    for (size_t i = 0; i < size; i++) {
-        if (cmp_buf[i] != buf[i]) {
-            printf(
-                "\033[;31mWrite blocks failed! Content is not "
-                "consistent.\033[0;m\n");
-            exit(1);
-        }
-    }
-
     return;
 }
 
@@ -323,6 +324,8 @@ void inode_manager::remove_file(uint32_t inum) {
     // reset metadata
     ino->type = 0;
     ino->size = 0;
+    std::time_t time = std::time(NULL);
+    ino->mtime = time;
     put_inode(inum, ino);
     return;
 }
