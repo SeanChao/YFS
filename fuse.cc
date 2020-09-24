@@ -209,8 +209,10 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
 #if 1
     // Change the above line to "#if 1", and your code goes here
     int r;
+    // size_t exp_size = size;
     if ((r = yfs->write(ino, size, off, buf, size)) == yfs_client::OK) {
         fuse_reply_write(req, size);
+        // std::cout << "[FUSE] [W] OK. expect " << exp_size << " got " << size << "\n"; 
     } else {
         fuse_reply_err(req, ENOENT);
     }

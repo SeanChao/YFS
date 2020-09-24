@@ -318,7 +318,8 @@ int yfs_client::write(inum ino, size_t size, off_t off, const char *data,
                   << " and buf is:\n"
                   << buf << std::endl;
     } else {
-        std::string new_data(data);
+        std::string new_data;
+        new_data.assign(data, size);
         std::cout << "using replace policy size=" << size
                   << " data.size()=" << new_data.size() << std::endl;
         buf.replace(off, size, new_data.substr(0, size));
