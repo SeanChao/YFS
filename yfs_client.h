@@ -38,10 +38,13 @@ class yfs_client {
    private:
     static std::string filename(inum);
     static inum n2i(std::string);
+    bool is_type(inum inum, extent_protocol::types type) const;
 
     std::string to_str(std::string filename, inum ino);
     std::string get_filename(std::string buf);
     static inum get_ino(std::string buf);
+
+    int path_to_inum(std::string path, inum &ino_out);
 
    public:
     yfs_client();
@@ -49,6 +52,7 @@ class yfs_client {
 
     bool isfile(inum);
     bool isdir(inum);
+    bool is_symlink(inum);
 
     int getfile(inum, fileinfo &);
     int getdir(inum, dirinfo &);
@@ -63,6 +67,9 @@ class yfs_client {
     int mkdir(inum, const char *, mode_t, inum &);
 
     /** you may need to add symbolic link related methods here.*/
+    int symlink(const char *link, inum ino, const char *name, inum &ino_out);
+    // readlink returns the path of symlink whose inode number is ino
+    int readlink(inum ino, std::string &path);
 };
 
 #endif

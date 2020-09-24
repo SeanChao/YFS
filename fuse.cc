@@ -45,7 +45,7 @@ getattr(yfs_client::inum inum, struct stat &st)
     bzero(&st, sizeof(st));
 
     st.st_ino = inum;
-    printf("getattr %016llx %d\n", inum, yfs->isfile(inum));
+    printf("getattr %016llx isfile: %d\n", inum, yfs->isfile(inum));
     if(yfs->isfile(inum)){
         yfs_client::fileinfo info;
         ret = yfs->getfile(inum, info);
@@ -58,7 +58,7 @@ getattr(yfs_client::inum inum, struct stat &st)
         st.st_ctime = info.ctime;
         st.st_size = info.size;
         printf("   getattr -> %llu\n", info.size);
-    } else {
+    } else if(yfs->isdir(inum)){
         yfs_client::dirinfo info;
         ret = yfs->getdir(inum, info);
         if(ret != yfs_client::OK)
@@ -69,6 +69,13 @@ getattr(yfs_client::inum inum, struct stat &st)
         st.st_mtime = info.mtime;
         st.st_ctime = info.ctime;
         printf("   getattr -> %lu %lu %lu\n", info.atime, info.mtime, info.ctime);
+    } else if(yfs->is_symlink(inum)) {
+        std::string path;
+        ret = yfs->readlink(inum, path);
+        st.st_mode = S_IFLNK | 0777;
+        st.st_nlink = 1;
+        st.st_size = path.size();
+        std::cout << "\t getattr[symlink]\n"; 
     }
     return yfs_client::OK;
 }
@@ -138,6 +145,10 @@ fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
     fuse_reply_err(req, ENOSYS);
 #endif
 
+    } else if(FUSE_SET_ATTR_ATIME & to_set) {
+        struct stat st;
+        getattr(ino, st);
+        fuse_reply_attr(req, &st, 0);
     } else {
         fuse_reply_err(req, ENOSYS);
     }
@@ -457,7 +468,53 @@ fuseserver_statfs(fuse_req_t req)
     fuse_reply_statfs(req, &buf);
 }
 
-struct fuse_lowlevel_ops fuseserver_oper;
+/**
+ * Create a symbolic link
+ *
+ * Valid replies: fuse_reply_entry fuse_reply_err
+ *
+ * Parameters
+ * req	request handle
+ * link	the contents of the symbolic link
+ * parent	inode number of the parent directory
+ * name	to create
+*/
+void fuseserver_symlink(fuse_req_t req, const char *link, fuse_ino_t parent,
+                        const char *name) {
+    int r;
+    std::cout << "[FUSE] [LINK]" << link << " <- " << name << "\n";
+    unsigned long long  ino_out;
+    if ((r = yfs->symlink(link, parent, name, ino_out) == yfs_client::OK)) {
+        std::cout << "[FUSE] [LINK] OKK " << link << " name " << name << "\n";
+        struct fuse_entry_param e;
+        e.ino = ino_out;
+        e.attr_timeout = 0.0;
+        e.entry_timeout = 0.0;
+        e.generation = 0;
+        getattr(ino_out, e.attr);
+        fuse_reply_entry(req, &e);
+    } else {
+        fuse_reply_err(req, r);
+    }
+}
+
+void fuseserver_readlink(fuse_req_t req, fuse_ino_t ino) {
+    std::cout << "[FUSE] [READLINK] " << ino << "\n";
+    std::string path;
+    int r = yfs->readlink(ino, path);
+    if (r == yfs_client::OK)
+        fuse_reply_readlink(req, path.c_str());
+    else
+        fuse_reply_err(req, r);
+}
+
+void fuseserver_flush(fuse_req_t req, fuse_ino_t ino,
+                                 struct fuse_file_info *fi) {
+    std::cout << "[FUSE] [FLUSH] called, do nothing" << "\n"; 
+    fuse_reply_err(req, ENOSYS);
+}
+
+    struct fuse_lowlevel_ops fuseserver_oper;
 
 int
 main(int argc, char *argv[])
@@ -504,6 +561,9 @@ main(int argc, char *argv[])
      * routines here to implement symbolic link,
      * rmdir, etc.
      * */
+    fuseserver_oper.symlink = fuseserver_symlink;
+    fuseserver_oper.readlink = fuseserver_readlink;
+    fuseserver_oper.flush = fuseserver_flush;
 
     const char *fuse_argv[20];
     int fuse_argc = 0;

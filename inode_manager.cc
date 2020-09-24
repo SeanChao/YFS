@@ -175,7 +175,7 @@ void inode_manager::put_inode(uint32_t inum, struct inode *ino) {
     char buf[BLOCK_SIZE];
     struct inode *ino_disk;
 
-    printf("\tim: put_inode %d\n", inum);
+    // printf("\tim: put_inode %d\n", inum);
     if (ino == NULL) return;
 
     bm->read_block(IBLOCK(inum, bm->sb.nblocks), buf);
@@ -202,7 +202,7 @@ void inode_manager::read_file(uint32_t inum, char **buf_out, int *size) {
     *size = ino->size;
     int nblk = NBLK(ino->size);
     char *tmp = (char *)malloc(sizeof(char) * (nblk * BLOCK_SIZE));
-    printf("\tmalloc ok\n");
+    // printf("\tmalloc ok\n");
     int block_idx;
     for (block_idx = 0; block_idx < nblk; block_idx++) {
         blockid_t bid = get_inode_block(ino, block_idx);
