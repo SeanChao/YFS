@@ -100,13 +100,10 @@ uint32_t inode_manager::alloc_inode(uint32_t type) {
      * the 1st is used for root_dir, see inode_manager::inode_manager().
      */
 
-    char buf[BLOCK_SIZE];
     inode_t *inode_buf;
     // Find a free inode in inode table
     for (uint32_t i = 1; i < bm->sb.ninodes; i++) {
         inode_buf = get_inode(i);
-        // bm->read_block(IBLOCK(i, bm->sb.nblocks), buf);
-        // struct inode *ino = (struct inode *)buf;
         if (inode_buf == NULL) {
             printf("> im: alloc_inode %d\n", i);
             inode_t ino;
@@ -229,7 +226,7 @@ void inode_manager::write_file(uint32_t inum, const char *buf, int size) {
         printf("ERR! inode %d not found\n", inum);
         return;
     }
-    if (size > MAXFILE * BLOCK_SIZE) {
+    if ((unsigned)size > MAXFILE * BLOCK_SIZE) {
         printf("ERR! File size is too large to support!");
         return;
     }
@@ -255,8 +252,13 @@ void inode_manager::write_file(uint32_t inum, const char *buf, int size) {
                 bm->write_block(indirect_id, buf);
             }
         }
+    } else if (new_blk_num < o_blk_num) {
+        // free blocks
+        int diff = o_blk_num - new_blk_num;
+        for (int i = 0; i < diff; i++) {
+            bm->free_block(get_inode_block(ino, new_blk_num + i));
+        }
     }
-    // TODO: free blocks
     // Write new file data
     int block_idx;
     for (block_idx = 0; block_idx < new_blk_num; block_idx++) {

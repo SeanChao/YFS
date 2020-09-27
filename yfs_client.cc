@@ -169,7 +169,6 @@ int yfs_client::create(inum parent, const char *name, mode_t mode,
     if (ec->create(extent_protocol::T_FILE, ino_out) != OK) {
         return IOERR;
     }
-    // TODO: modify the parent info
     // Add an entry to parent
     buf.append(to_str(std::string(name), ino_out));
     ec->put(parent, buf);
@@ -296,7 +295,8 @@ int yfs_client::read(inum ino, size_t size, off_t off, std::string &data) {
 
 int yfs_client::write(inum ino, size_t size, off_t off, const char *data,
                       size_t &bytes_written) {
-    std::cout << "[yc] [write] " << ino << " size=" << size << " off=" << off << "\n";
+    std::cout << "[yc] [write] " << ino << " size=" << size << " off=" << off
+              << "\n";
     int r = OK;
 
     /*
@@ -327,7 +327,8 @@ int yfs_client::write(inum ino, size_t size, off_t off, const char *data,
     }
     // setattr(ino, buf.size());
     r = ec->put(ino, buf);
-    std::cout << bytes_written << " bytes written, now size " << buf.size() << " r=" << r << "\n";
+    std::cout << bytes_written << " bytes written, now size " << buf.size()
+              << " r=" << r << "\n";
     //   << " updated:\n";
     //   << buf << "|||\n";
     return r;
@@ -370,7 +371,8 @@ int yfs_client::unlink(inum parent, const char *name) {
 
 int yfs_client::symlink(const char *link, inum parent, const char *name,
                         inum &ino_out) {
-    std::cout << "[YC] [SYMLINK]" << parent << " " << name << " " << link <<  "\n";
+    std::cout << "[YC] [SYMLINK]" << parent << " " << name << " " << link
+              << "\n";
     // create a new file, write path(link) into it
     int r = OK;
 
