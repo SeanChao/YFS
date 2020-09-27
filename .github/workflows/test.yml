@@ -11,4 +11,4 @@ jobs:
         run: docker pull ddnirvana/cselab_env:latest
       - name: Test
         run: |
-          sudo docker run -it --privileged --cap-add=ALL -v ${PWD}/yfs:/labenv ddnirvana/cselab_env:latest bash -c "cd /labenv && make && ./grade.sh"
+          sudo docker run --privileged --cap-add=ALL -v ${PWD}/yfs:/labenv ddnirvana/cselab_env:latest bash -c "cd /labenv && make && ./grade.sh"
