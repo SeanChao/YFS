@@ -12,3 +12,14 @@ extent_server
 lock_server
 lock_tester
 yfs_client
+
+part1_tester
+yfs_client
+
+.devcontainer
+.vscode
+
+# log and build files
+yfs_client1.log
+fuseout.log
+yfs1

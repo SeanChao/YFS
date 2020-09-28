@@ -1,0 +1,15 @@
+name: Tests
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup
+        run: docker pull ddnirvana/cselab_env:latest
+      - name: Test
+        run: |
+          ls -la
+          sudo docker run --privileged --cap-add=ALL -v ${PWD}:/labenv ddnirvana/cselab_env:latest bash -c "cd /labenv && make && ./grade.sh"
