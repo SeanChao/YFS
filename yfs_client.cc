@@ -115,8 +115,7 @@ int yfs_client::setattr(inum ino, size_t size) {
     int r = OK;
 
     /*
-     * your code goes here.
-     * note: get the content of inode ino, and modify its content
+     * get the content of inode ino, and modify its content
      * according to the size (<, =, or >) content length.
      */
     extent_protocol::attr a;
@@ -149,8 +148,10 @@ int yfs_client::create(inum parent, const char *name, mode_t mode,
      * after create file or dir, you must remember to modify the parent
      * infomation.
      */
+    lc->acquire(parent);
     bool found = false;
     if (lookup(parent, name, found, ino_out) == OK && found) {
+        lc->release(parent);
         return EXIST;
     }
     if (!isdir(parent) && !is_symlink(parent)) return IOERR;
@@ -166,11 +167,13 @@ int yfs_client::create(inum parent, const char *name, mode_t mode,
     //   << "get parent ok\n";
     // create inode
     if (ec->create(extent_protocol::T_FILE, ino_out) != OK) {
+        lc->release(parent);
         return IOERR;
     }
     // Add an entry to parent
     buf.append(to_str(std::string(name), ino_out));
     ec->put(parent, buf);
+    lc->release(parent);
     return r;
 }
 
@@ -191,6 +194,7 @@ int yfs_client::mkdir(inum parent, const char *name, mode_t mode,
     }
     if (!isdir(parent)) return IOERR;
     std::string buf;
+    lc->acquire(parent);
     ec->get(parent, buf);
     // create inode
     if (ec->create(extent_protocol::T_DIR, ino_out) != OK) {
@@ -199,6 +203,7 @@ int yfs_client::mkdir(inum parent, const char *name, mode_t mode,
     // Add an entry to parent
     buf.append(to_str(std::string(name), ino_out));
     ec->put(parent, buf);
+    lc->release(parent);
     return r;
 }
 
@@ -231,6 +236,7 @@ int yfs_client::lookup(inum parent, const char *name, bool &found,
 }
 
 int yfs_client::readdir(inum dir, std::list<dirent> &list) {
+    // lc->acquire(dir);
     std::cout << "[YC] [READDIR] " << dir << "\n";
     int r = OK;
 
@@ -260,7 +266,7 @@ int yfs_client::readdir(inum dir, std::list<dirent> &list) {
             e.name = fname;
             e.inum = n2i(ino);
             list.push_back(e);
-            std::cout << "\tdir ent: " << e.name << "\t" << e.inum << "\n";
+            // std::cout << "\tdir ent: " << e.name << "\t" << e.inum << "\n";
         }
     } else if (is_symlink(dir)) {
         std::cout << "\t Read symlink dir!\n";
@@ -269,6 +275,7 @@ int yfs_client::readdir(inum dir, std::list<dirent> &list) {
     }
     std::cout << "\t[YC] [READDIR] "
               << "build list OK\n";
+    // lc->release(dir);
     return r;
 }
 
@@ -294,6 +301,7 @@ int yfs_client::read(inum ino, size_t size, off_t off, std::string &data) {
 
 int yfs_client::write(inum ino, size_t size, off_t off, const char *data,
                       size_t &bytes_written) {
+    lc->acquire(ino);
     std::cout << "[yc] [write] " << ino << " size=" << size << " off=" << off
               << "\n";
     int r = OK;
@@ -330,10 +338,13 @@ int yfs_client::write(inum ino, size_t size, off_t off, const char *data,
               << " r=" << r << "\n";
     //   << " updated:\n";
     //   << buf << "|||\n";
+    lc->release(ino);
     return r;
 }
 
 int yfs_client::unlink(inum parent, const char *name) {
+    std::cout << "[YC] [UNLINK] p" << parent << " " << name << std::endl;
+    lc->acquire(parent);
     int r = OK;
 
     /*
@@ -341,7 +352,6 @@ int yfs_client::unlink(inum parent, const char *name) {
      * note: you should remove the file using ec->remove,
      * and update the parent directory content.
      */
-    // bool dir = isdir(parent);
     bool symlink = is_symlink(parent);
     if (symlink) {
         std::string path = "";
@@ -353,23 +363,29 @@ int yfs_client::unlink(inum parent, const char *name) {
     readdir(parent, flist);
     for (std::list<dirent>::iterator i = flist.begin(); i != flist.end(); i++) {
         if (i->name.compare(name) == 0) {
+            inum lid = i->inum;
+            lc->acquire(lid);
             flist.erase(i);
-            std::string buf;
             ec->remove(i->inum);
+            std::string buf;
             for (std::list<dirent>::iterator i = flist.begin();
                  i != flist.end(); i++) {
                 buf.append(to_str(i->name, i->inum));
             }
             ec->put(parent, buf);
+            lc->release(lid);
+            lc->release(parent);
             return OK;
         }
     }
     r = NOENT;
+    lc->release(parent);
     return r;
 }
 
 int yfs_client::symlink(const char *link, inum parent, const char *name,
                         inum &ino_out) {
+    lc->acquire(parent);
     std::cout << "[YC] [SYMLINK]" << parent << " " << name << " " << link
               << "\n";
     // create a new file, write path(link) into it
@@ -383,6 +399,7 @@ int yfs_client::symlink(const char *link, inum parent, const char *name,
     if (ec->create(extent_protocol::T_SYMLINK, ino_out) != OK) {
         return IOERR;
     }
+    lc->acquire(ino_out);
     // Add an entry to parent
     buf.append(to_str(std::string(name), ino_out));
     ec->put(parent, buf);
@@ -391,6 +408,8 @@ int yfs_client::symlink(const char *link, inum parent, const char *name,
     size_t written = 0;
     r = write(ino_out, strlen(link), 0, link, written);
     std::cout << "\t symlink returned " << r << "\n";
+    lc->release(ino_out);
+    lc->release(parent);
     return r;
 }
 

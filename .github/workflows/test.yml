@@ -12,4 +12,4 @@ jobs:
       - name: Test
         run: |
           ls -la
-          sudo docker run --privileged --cap-add=ALL -v ${PWD}:/labenv ddnirvana/cselab_env:latest bash -c "cd /labenv && make && ./grade.sh"
+          sudo docker run --privileged --cap-add=ALL -u root -v ${PWD}:/labenv ddnirvana/cselab_env:latest bash -c "cd /labenv && make && ./grade.sh"
