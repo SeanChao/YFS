@@ -15,8 +15,8 @@
 yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
     ec = new extent_client(extent_dst);
     // Lab2: Use lock_client_cache when you test lock_cache
-    lc = new lock_client(lock_dst);
-    // lc = new lock_client_cache(lock_dst);
+    // lc = new lock_client(lock_dst);
+    lc = new lock_client_cache(lock_dst);
     if (ec->put(1, "") != extent_protocol::OK)
         printf("error init root dir\n");  // XYB: init root dir
 }
@@ -126,7 +126,7 @@ int yfs_client::setattr(inum ino, size_t size) {
     if (oldsize == size) return OK;
     std::string buf;
     ec->get(ino, buf);
-    std::cout << "BUF:\n" << buf << std::endl;
+    // std::cout << "BUF:\n" << buf << std::endl;
     if (size < oldsize) {
         r = ec->put(ino, buf.substr(0, size));
     } else {
@@ -139,6 +139,7 @@ int yfs_client::setattr(inum ino, size_t size) {
 
 int yfs_client::create(inum parent, const char *name, mode_t mode,
                        inum &ino_out) {
+    lc->acquire(parent);
     std::cout << "[YC] [CREATE] " << name << " at " << parent << std::endl;
     int r = OK;
 
@@ -148,10 +149,10 @@ int yfs_client::create(inum parent, const char *name, mode_t mode,
      * after create file or dir, you must remember to modify the parent
      * infomation.
      */
-    lc->acquire(parent);
     bool found = false;
     if (lookup(parent, name, found, ino_out) == OK && found) {
         lc->release(parent);
+        std::cerr << "!ERR file exists" << std::endl;
         return EXIST;
     }
     if (!isdir(parent) && !is_symlink(parent)) return IOERR;
@@ -162,17 +163,28 @@ int yfs_client::create(inum parent, const char *name, mode_t mode,
         std::cout << "\tSymlink: set target parent: " << parent << "\n";
     }
     std::string buf;
-    ec->get(parent, buf);
-    // std::cout << "[yc] [CREATE] "
-    //   << "get parent ok\n";
-    // create inode
-    if (ec->create(extent_protocol::T_FILE, ino_out) != OK) {
-        lc->release(parent);
-        return IOERR;
+    r = ec->get(parent, buf);
+    if(r != extent_protocol::OK) {
+        std::cerr << "read parent failed" << std::endl;
+        return r;
     }
+    std::cout << "[yc] [CREATE] "
+              << "get parent ok\n";
+    // create inode
+    // FIXME: ec is not thread-safe, it may give the same inode to two different
+    // yfs_client(whose parent is not the same) to the new file
+    if ((r = ec->create(extent_protocol::T_FILE, ino_out)) != OK) {
+        std::cerr << "!ERR ec returns error " << r << std::endl;
+        lc->release(parent);
+        return r;
+    }
+    std::cout << "[yc] [CREATE] inode: " << ino_out << "\n";
     // Add an entry to parent
     buf.append(to_str(std::string(name), ino_out));
-    ec->put(parent, buf);
+    if((r = ec->put(parent, buf)) != extent_protocol::OK) {
+        std::cerr << "!ERR ec put" << std::endl;
+        return r;
+    }
     lc->release(parent);
     return r;
 }
@@ -220,15 +232,14 @@ int yfs_client::lookup(inum parent, const char *name, bool &found,
     if (!isdir(parent)) return NOENT;
     std::list<dirent> flist;
     if (readdir(parent, flist) != OK) return IOERR;
-    std::cout << "\t[YC] [LOOKUP] "
-              << "readdir OK\n";
+    std::cout << "\t[YC] [LOOKUP] -> readdir OK\n";
     for (std::list<dirent>::iterator it = flist.begin(); it != flist.end();
          it++) {
         if (name == it->name) {
             r = OK;
             found = true;
             ino_out = it->inum;
-            std::cout << "yc: lookup found " << ino_out << "\n";
+            std::cout << "\tyc: lookup found " << ino_out << "\n";
             break;
         }
     }
@@ -236,7 +247,6 @@ int yfs_client::lookup(inum parent, const char *name, bool &found,
 }
 
 int yfs_client::readdir(inum dir, std::list<dirent> &list) {
-    // lc->acquire(dir);
     std::cout << "[YC] [READDIR] " << dir << "\n";
     int r = OK;
 
@@ -273,9 +283,7 @@ int yfs_client::readdir(inum dir, std::list<dirent> &list) {
     } else {
         std::cout << "!!!!!!!!!!!!!!!readdir call to a file!\n";
     }
-    std::cout << "\t[YC] [READDIR] "
-              << "build list OK\n";
-    // lc->release(dir);
+    std::cout << "<[YC] [READDIR] build list OK\n";
     return r;
 }
 
@@ -295,7 +303,8 @@ int yfs_client::read(inum ino, size_t size, off_t off, std::string &data) {
         data = "";
     else
         data = buf.substr(off, size);
-    std::cout << "data read " << data.size() << " bytes : \n" << data << "<\n";
+    // std::cout << "data read " << data.size() << " bytes : \n" << data <<
+    // "<\n";
     return r;
 }
 
@@ -307,13 +316,12 @@ int yfs_client::write(inum ino, size_t size, off_t off, const char *data,
     int r = OK;
 
     /*
-     * your code goes here.
-     * note: write using ec->put().
+     * write using ec->put().
      * when off > length of original file, fill the holes with '\0'.
      */
     std::string buf;
     r = ec->get(ino, buf);
-    std::cout << "origin size " << buf.size() << " original content:\n";
+    // std::cout << "origin size " << buf.size() << " original content:\n";
     //   << buf << "|||\n";
     if (off > (long)buf.size()) {
         std::string tmp = "";
@@ -321,14 +329,14 @@ int yfs_client::write(inum ino, size_t size, off_t off, const char *data,
         std::string new_data = std::string(off - buf.size(), '\0') + tmp;
         buf = buf + new_data;
         bytes_written = new_data.length();
-        std::cout << "write beyond buf, add 0's newsize=" << buf.size()
-                  << " and buf is:\n"
-                  << buf << std::endl;
+        // std::cout << "write beyond buf, add 0's newsize=" << buf.size()
+        //           << " and buf is:\n"
+        //           << buf << std::endl;
     } else {
         std::string new_data;
         new_data.assign(data, size);
-        std::cout << "using replace policy size=" << size
-                  << " data.size()=" << new_data.size() << std::endl;
+        // std::cout << "using replace policy size=" << size
+        //           << " data.size()=" << new_data.size() << std::endl;
         buf.replace(off, size, new_data.substr(0, size));
         bytes_written = size;
     }
@@ -343,13 +351,12 @@ int yfs_client::write(inum ino, size_t size, off_t off, const char *data,
 }
 
 int yfs_client::unlink(inum parent, const char *name) {
-    std::cout << "[YC] [UNLINK] p" << parent << " " << name << std::endl;
     lc->acquire(parent);
+    std::cout << "[YC] [UNLINK] parent " << parent << " " << name << std::endl;
     int r = OK;
 
     /*
-     * your code goes here.
-     * note: you should remove the file using ec->remove,
+     * remove the file using ec->remove,
      * and update the parent directory content.
      */
     bool symlink = is_symlink(parent);
@@ -358,8 +365,12 @@ int yfs_client::unlink(inum parent, const char *name) {
         readlink(parent, path);
         path_to_inum(path, parent);
     }
-    if (!isdir(parent)) return IOERR;
+    if (!isdir(parent)) {
+        std::cerr << "!!!PARENT is not a directory" << std::endl;
+        return IOERR;
+    }
     std::list<dirent> flist;
+    std::cout << "[YC] [UNLINK]->readdir\n";
     readdir(parent, flist);
     for (std::list<dirent>::iterator i = flist.begin(); i != flist.end(); i++) {
         if (i->name.compare(name) == 0) {
@@ -375,6 +386,7 @@ int yfs_client::unlink(inum parent, const char *name) {
             ec->put(parent, buf);
             lc->release(lid);
             lc->release(parent);
+            std::cout << "[YC] [UNLINK] OK\n";
             return OK;
         }
     }
@@ -386,12 +398,10 @@ int yfs_client::unlink(inum parent, const char *name) {
 int yfs_client::symlink(const char *link, inum parent, const char *name,
                         inum &ino_out) {
     lc->acquire(parent);
-    std::cout << "[YC] [SYMLINK]" << parent << " " << name << " " << link
+    std::cout << "[YC] [SYMLINK] " << parent << " " << name << " " << link
               << "\n";
     // create a new file, write path(link) into it
     int r = OK;
-
-    // bool found = false;
     if (!isdir(parent)) return IOERR;
     std::string buf;
     ec->get(parent, buf);
@@ -399,16 +409,17 @@ int yfs_client::symlink(const char *link, inum parent, const char *name,
     if (ec->create(extent_protocol::T_SYMLINK, ino_out) != OK) {
         return IOERR;
     }
-    lc->acquire(ino_out);
+    // No need to lock since write itself would lock
+    // lc->acquire(ino_out);
     // Add an entry to parent
     buf.append(to_str(std::string(name), ino_out));
     ec->put(parent, buf);
 
-    std::cout << "\t Create symlink file in parent ok\n";
+    // std::cout << "\t Create symlink file in parent ok\n";
     size_t written = 0;
     r = write(ino_out, strlen(link), 0, link, written);
-    std::cout << "\t symlink returned " << r << "\n";
-    lc->release(ino_out);
+    // std::cout << "\t symlink returned " << r << "\n";
+    // lc->release(ino_out);
     lc->release(parent);
     return r;
 }

@@ -30,6 +30,7 @@ lock_protocol::status lock_server::stat(int clt, lock_protocol::lockid_t lid,
     lock_protocol::status ret = lock_protocol::OK;
     printf("stat request from clt %d\n", clt);
     r = nacquire;
+    pthread_mutex_init(&lock, NULL);
     pthread_mutex_lock(&lock);
     r = this->lock_state[lid];
     pthread_mutex_unlock(&lock);
@@ -40,6 +41,7 @@ lock_protocol::status lock_server::acquire(int clt, lock_protocol::lockid_t lid,
                                            int &r) {
     lock_protocol::status ret = lock_protocol::OK;
     // Your lab2 part2 code goes here
+    std::cout << "ACQ " << lid << std::endl;
     pthread_mutex_lock(&lock);
     // std::map<lock_protocol::lockid_t, int>::iterator it =
     // lock_state.find(lid);
@@ -50,14 +52,14 @@ lock_protocol::status lock_server::acquire(int clt, lock_protocol::lockid_t lid,
         lock_state[lid]++;
         lock_cv[lid] = PTHREAD_COND_INITIALIZER;
     } else {
-        std::cout << "SERVER waiting for cv " << lid << " lock state " << lock_state[lid] << " to " << clt << "\n";
+        // std::cout << "SERVER waiting for cv " << lid << " lock state " << lock_state[lid] << " to " << clt << "\n";
         // No race condition since lock_state is locked
         while (lock_state[lid] > 0) pthread_cond_wait(&(cit->second), &lock);
         lock_state[lid]++;
     }
     pthread_mutex_unlock(&lock);
     r = 0;
-    std::cout << "SERVER granted " << lid << " to " << clt << "\n";
+    // std::cout << "SERVER granted " << lid << " to " << clt << "\n";
     return ret;
 }
 

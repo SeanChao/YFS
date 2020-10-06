@@ -16,7 +16,7 @@ class lock_server {
   int nacquire;
   std::map<lock_protocol::lockid_t, int> lock_state;
   std::map<lock_protocol::lockid_t, pthread_cond_t> lock_cv;
-  pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+  pthread_mutex_t lock;
 
  public:
   lock_server();

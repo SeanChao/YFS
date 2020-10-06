@@ -3,6 +3,7 @@
 #ifndef inode_h
 #define inode_h
 
+#include <pthread.h>
 #include <stdint.h>
 
 #include "extent_protocol.h"  // TODO: delete it
@@ -36,9 +37,10 @@ typedef struct superblock {
 class block_manager {
    private:
     disk *d;
-    std::map<uint32_t, int>
-        using_blocks;  // for block manager itself, for inode layer it should
-                       // look for the real block
+    // for block manager itself, for inode layer it should look for the real
+    // block
+    std::map<uint32_t, int> using_blocks;
+    pthread_mutex_t lock;
 
    public:
     block_manager();
@@ -92,6 +94,7 @@ class inode_manager {
     struct inode *get_inode(uint32_t inum);
     void put_inode(uint32_t inum, struct inode *ino);
     blockid_t get_inode_block(inode_t *ino, unsigned int idx) const;
+    pthread_mutex_t lock;
 
    public:
     inode_manager();

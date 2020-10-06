@@ -23,3 +23,12 @@ yfs_client
 yfs_client1.log
 fuseout.log
 yfs1
+
+# exec
+core
+lock_demo
+test-lab2-part1-g
+test-lab2-part2-a
+test-lab2-part2-b
+test-lab2-part3-a
+test-lab2-part3-b
