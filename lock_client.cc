@@ -37,7 +37,7 @@ lock_protocol::status lock_client::acquire(lock_protocol::lockid_t lid) {
     lock_protocol::status ret =
         cl->call(lock_protocol::acquire, cl->id(), lid, r);
     VERIFY(ret == lock_protocol::OK);
-    printf("??CLIENT acquried %lld\n", lid);
+    printf("CLIENT acquried %lld\n", lid);
     return r;
 }
 

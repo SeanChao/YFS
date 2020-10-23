@@ -142,14 +142,11 @@ int yfs_client::create(inum parent, const char *name, mode_t mode,
     lc->acquire(parent);
     std::cout << "[YC] [CREATE] " << name << " at " << parent << std::endl;
     int r = OK;
-
-    /*
-     * your code goes here.
-     * note: lookup is what you need to check if file exist;
-     * after create file or dir, you must remember to modify the parent
-     * infomation.
-     */
+    lc->release(parent);
+    lc->acquire(parent);
     bool found = false;
+    lc->release(parent);
+    lc->acquire(parent);
     if (lookup(parent, name, found, ino_out) == OK && found) {
         lc->release(parent);
         std::cerr << "!ERR file exists" << std::endl;
@@ -164,7 +161,7 @@ int yfs_client::create(inum parent, const char *name, mode_t mode,
     }
     std::string buf;
     r = ec->get(parent, buf);
-    if(r != extent_protocol::OK) {
+    if (r != extent_protocol::OK) {
         std::cerr << "read parent failed" << std::endl;
         return r;
     }
@@ -181,7 +178,7 @@ int yfs_client::create(inum parent, const char *name, mode_t mode,
     std::cout << "[yc] [CREATE] inode: " << ino_out << "\n";
     // Add an entry to parent
     buf.append(to_str(std::string(name), ino_out));
-    if((r = ec->put(parent, buf)) != extent_protocol::OK) {
+    if ((r = ec->put(parent, buf)) != extent_protocol::OK) {
         std::cerr << "!ERR ec put" << std::endl;
         return r;
     }
@@ -193,13 +190,6 @@ int yfs_client::mkdir(inum parent, const char *name, mode_t mode,
                       inum &ino_out) {
     std::cout << "[YC] [MKDIR] " << name << " at " << parent << "\n";
     int r = OK;
-
-    /*
-     * your code goes here.
-     * note: lookup is what you need to check if directory exist;
-     * after create file or dir, you must remember to modify the parent
-     * infomation.
-     */
     bool found = false;
     if (lookup(parent, name, found, ino_out) == OK && found) {
         return EXIST;
@@ -224,11 +214,6 @@ int yfs_client::lookup(inum parent, const char *name, bool &found,
     std::cout << "[YC] [LOOKUP] " << name << " in " << parent << '\n';
     int r = NOENT;
 
-    /*
-     * your code goes here.
-     * note: lookup file from parent dir according to name;
-     * you should design the format of directory content.
-     */
     if (!isdir(parent)) return NOENT;
     std::list<dirent> flist;
     if (readdir(parent, flist) != OK) return IOERR;
@@ -290,12 +275,8 @@ int yfs_client::readdir(inum dir, std::list<dirent> &list) {
 int yfs_client::read(inum ino, size_t size, off_t off, std::string &data) {
     std::cout << "[YC] [READ] " << ino << " size=" << size << " off=" << off
               << "\n";
+    // lc->acquire(ino);
     int r = OK;
-
-    /*
-     * your code goes here.
-     * note: read using ec->get().
-     */
     std::string buf;
     r = ec->get(ino, buf);
     // std::cout << "\tget OK\n";
@@ -303,8 +284,8 @@ int yfs_client::read(inum ino, size_t size, off_t off, std::string &data) {
         data = "";
     else
         data = buf.substr(off, size);
-    // std::cout << "data read " << data.size() << " bytes : \n" << data <<
-    // "<\n";
+    // std::cout << "data read " << data.size() << " bytes:\n" << data << "<\n";
+    // lc->release(ino);
     return r;
 }
 
@@ -359,18 +340,27 @@ int yfs_client::unlink(inum parent, const char *name) {
      * remove the file using ec->remove,
      * and update the parent directory content.
      */
+    lc->release(parent);
+    lc->acquire(parent);
     bool symlink = is_symlink(parent);
     if (symlink) {
         std::string path = "";
         readlink(parent, path);
         path_to_inum(path, parent);
     }
+    lc->release(parent);
+    lc->acquire(parent);
     if (!isdir(parent)) {
         std::cerr << "!!!PARENT is not a directory" << std::endl;
+        lc->release(parent);
         return IOERR;
     }
+    lc->release(parent);
+    lc->acquire(parent);
     std::list<dirent> flist;
     std::cout << "[YC] [UNLINK]->readdir\n";
+    lc->release(parent);
+    lc->acquire(parent);
     readdir(parent, flist);
     for (std::list<dirent>::iterator i = flist.begin(); i != flist.end(); i++) {
         if (i->name.compare(name) == 0) {
