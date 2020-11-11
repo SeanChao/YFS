@@ -1,0 +1,5 @@
+BasedOnStyle: Google
+IndentWidth: 4
+AlignEscapedNewlines: Left
+AlignConsecutiveMacros: true
+AllowShortFunctionsOnASingleLine: Empty
