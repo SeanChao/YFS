@@ -45,7 +45,7 @@ getattr(yfs_client::inum inum, struct stat &st)
     bzero(&st, sizeof(st));
 
     st.st_ino = inum;
-    printf("getattr %016llx isfile: %d\n", inum, yfs->isfile(inum));
+    // printf("getattr %016llx isfile: %d\n", inum, yfs->isfile(inum));
     if(yfs->isfile(inum)){
         yfs_client::fileinfo info;
         ret = yfs->getfile(inum, info);
@@ -57,7 +57,7 @@ getattr(yfs_client::inum inum, struct stat &st)
         st.st_mtime = info.mtime;
         st.st_ctime = info.ctime;
         st.st_size = info.size;
-        printf("   getattr -> %llu\n", info.size);
+        // printf("   getattr -> %llu\n", info.size);
     } else if(yfs->isdir(inum)){
         yfs_client::dirinfo info;
         ret = yfs->getdir(inum, info);
@@ -68,14 +68,14 @@ getattr(yfs_client::inum inum, struct stat &st)
         st.st_atime = info.atime;
         st.st_mtime = info.mtime;
         st.st_ctime = info.ctime;
-        printf("   getattr -> %lu %lu %lu\n", info.atime, info.mtime, info.ctime);
+        // printf("   getattr -> %lu %lu %lu\n", info.atime, info.mtime, info.ctime);
     } else if(yfs->is_symlink(inum)) {
         std::string path;
         ret = yfs->readlink(inum, path);
         st.st_mode = S_IFLNK | 0777;
         st.st_nlink = 1;
         st.st_size = path.size();
-        std::cout << "\t getattr[symlink]\n"; 
+        // std::cout << "\t getattr[symlink]\n"; 
     }
     return yfs_client::OK;
 }
@@ -128,9 +128,9 @@ void
 fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
         int to_set, struct fuse_file_info *fi)
 {
-    printf("fuseserver_setattr 0x%x\n", to_set);
+    // printf("fuseserver_setattr 0x%x\n", to_set);
     if (FUSE_SET_ATTR_SIZE & to_set) {
-        printf("   fuseserver_setattr set size to %zu\n", attr->st_size);
+        // printf("   fuseserver_setattr set size to %zu\n", attr->st_size);
         struct stat st;
 
 #if 1
@@ -269,7 +269,7 @@ fuseserver_create(fuse_req_t req, fuse_ino_t parent, const char *name,
     yfs_client::status ret;
     if( (ret = fuseserver_createhelper( parent, name, mode, &e, extent_protocol::T_FILE)) == yfs_client::OK ) {
         fuse_reply_create(req, &e, fi);
-        printf("OK: create returns.\n");
+        // printf("OK: create returns.\n");
     } else {
         if (ret == yfs_client::EXIST) {
             fuse_reply_err(req, EEXIST);
@@ -366,7 +366,7 @@ fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
     yfs_client::inum inum = ino; // req->in.h.nodeid;
     struct dirbuf b;
 
-    printf("fuseserver_readdir\n");
+    // printf("fuseserver_readdir\n");
 
     if(!yfs->isdir(inum)){
         fuse_reply_err(req, ENOTDIR);
@@ -460,7 +460,7 @@ fuseserver_statfs(fuse_req_t req)
 {
     struct statvfs buf;
 
-    printf("statfs\n");
+    // printf("statfs\n");
 
     memset(&buf, 0, sizeof(buf));
 
@@ -484,10 +484,10 @@ fuseserver_statfs(fuse_req_t req)
 void fuseserver_symlink(fuse_req_t req, const char *link, fuse_ino_t parent,
                         const char *name) {
     int r;
-    std::cout << "[FUSE] [LINK]" << link << " <- " << name << "\n";
+    // std::cout << "[FUSE] [LINK]" << link << " <- " << name << "\n";
     unsigned long long  ino_out;
     if ((r = yfs->symlink(link, parent, name, ino_out) == yfs_client::OK)) {
-        std::cout << "[FUSE] [LINK] OKK " << link << " name " << name << "\n";
+        // std::cout << "[FUSE] [LINK] OKK " << link << " name " << name << "\n";
         struct fuse_entry_param e;
         e.ino = ino_out;
         e.attr_timeout = 0.0;
@@ -501,7 +501,7 @@ void fuseserver_symlink(fuse_req_t req, const char *link, fuse_ino_t parent,
 }
 
 void fuseserver_readlink(fuse_req_t req, fuse_ino_t ino) {
-    std::cout << "[FUSE] [READLINK] " << ino << "\n";
+    // std::cout << "[FUSE] [READLINK] " << ino << "\n";
     std::string path;
     int r = yfs->readlink(ino, path);
     if (r == yfs_client::OK)
@@ -512,7 +512,7 @@ void fuseserver_readlink(fuse_req_t req, fuse_ino_t ino) {
 
 void fuseserver_flush(fuse_req_t req, fuse_ino_t ino,
                                  struct fuse_file_info *fi) {
-    std::cout << "[FUSE] [FLUSH] called, do nothing" << "\n"; 
+    // std::cout << "[FUSE] [FLUSH] called, do nothing" << "\n"; 
     fuse_reply_err(req, ENOSYS);
 }
 
@@ -594,7 +594,6 @@ main(int argc, char *argv[])
     }
 
     args.allocated = 0;
-
     fd = fuse_mount(mountpoint, &args);
     if(fd == -1){
         fprintf(stderr, "fuse_mount failed\n");
@@ -604,8 +603,8 @@ main(int argc, char *argv[])
     struct fuse_session *se;
 
     se = fuse_lowlevel_new(&args, &fuseserver_oper, sizeof(fuseserver_oper),
-            NULL);
-    if(se == 0){
+                           NULL);
+    if (se == 0) {
         fprintf(stderr, "fuse_lowlevel_new failed\n");
         exit(1);
     }

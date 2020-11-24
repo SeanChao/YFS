@@ -36,9 +36,9 @@ typedef struct superblock {
 class block_manager {
    private:
     disk *d;
-    std::map<uint32_t, int>
-        using_blocks;  // for block manager itself, for inode layer it should
-                       // look for the real block
+    // for block manager itself, for inode layer it should look for the real
+    // block
+    std::vector<int> using_blocks;
 
    public:
     block_manager();

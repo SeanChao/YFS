@@ -35,16 +35,18 @@ std::string yfs_client::filename(inum inum) {
     return ost.str();
 }
 
-bool yfs_client::is_type(inum inum, extent_protocol::types type) const {
+uint32_t yfs_client::get_type(inum ino) {
+    std::map<inum, uint32_t>::const_iterator it = inum2tyCache.find(ino);
+    if (it != inum2tyCache.end()) return it->second;
     extent_protocol::attr a;
-    if (ec->getattr(inum, a) != extent_protocol::OK) {
-        printf("error getting attr\n");
-        return false;
-    }
-    if (a.type == type) {
-        return true;
-    }
-    return false;
+    ec->getattr(ino, a);
+    inum2tyCache[ino] = (uint32_t)a.type;
+
+    return a.type;
+}
+
+bool yfs_client::is_type(inum inum, extent_protocol::types type)  {
+    return get_type(inum) == type;
 }
 
 bool yfs_client::isfile(inum inum) {
@@ -67,7 +69,7 @@ bool yfs_client::is_symlink(inum inum) {
 int yfs_client::getfile(inum inum, fileinfo &fin) {
     int r = OK;
 
-    printf("getfile %016llx\n", inum);
+    // printf("getfile %016llx\n", inum);
     extent_protocol::attr a;
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
@@ -78,7 +80,7 @@ int yfs_client::getfile(inum inum, fileinfo &fin) {
     fin.mtime = a.mtime;
     fin.ctime = a.ctime;
     fin.size = a.size;
-    printf("getfile %016llx -> sz %llu\n", inum, fin.size);
+    // printf("getfile %016llx -> sz %llu\n", inum, fin.size);
 
 release:
     return r;
@@ -87,7 +89,7 @@ release:
 int yfs_client::getdir(inum inum, dirinfo &din) {
     int r = OK;
 
-    printf("getdir %016llx\n", inum);
+    // printf("getdir %016llx\n", inum);
     extent_protocol::attr a;
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
@@ -112,7 +114,7 @@ release:
 
 // Only support set size of attr
 int yfs_client::setattr(inum ino, size_t size) {
-    std::cout << "[YC] [SETATTR] " << ino << " " << size << "\n";
+    // std::cout << "[YC] [SETATTR] " << ino << " " << size << "\n";
     int r = OK;
 
     /*
@@ -128,11 +130,9 @@ int yfs_client::setattr(inum ino, size_t size) {
     if (oldsize == size) return OK;
     std::string buf;
     ec->get(ino, buf);
-    std::cout << "BUF:\n" << buf << std::endl;
     if (size < oldsize) {
         r = ec->put(ino, buf.substr(0, size));
     } else {
-        // std::cout << "###\n" << size << "%" << oldsize << "\n";
         r = ec->put(ino, buf.append(std::string(size - oldsize, '\0')));
     }
 
@@ -141,7 +141,7 @@ int yfs_client::setattr(inum ino, size_t size) {
 
 int yfs_client::create(inum parent, const char *name, mode_t mode,
                        inum &ino_out) {
-    std::cout << "[YC] [CREATE] " << name << " at " << parent << std::endl;
+    // std::cout << "[YC] [CREATE] " << name << " at " << parent << std::endl;
     int r = OK;
 
     /*
@@ -154,17 +154,16 @@ int yfs_client::create(inum parent, const char *name, mode_t mode,
     if (lookup(parent, name, found, ino_out) == OK && found) {
         return EXIST;
     }
-    if (!isdir(parent) && !is_symlink(parent)) return IOERR;
-    if (is_symlink(parent)) {
+    uint32_t ty = get_type(parent);
+    if (ty != extent_protocol::T_DIR && ty != extent_protocol::T_SYMLINK)
+        return IOERR;
+    if (ty == extent_protocol::T_SYMLINK) {
         std::string path;
         readlink(parent, path);
         path_to_inum(path, parent);
-        std::cout << "\tSymlink: set target parent: " << parent << "\n";
     }
     std::string buf;
     ec->get(parent, buf);
-    // std::cout << "[yc] [CREATE] "
-    //   << "get parent ok\n";
     // create inode
     if (ec->create(extent_protocol::T_FILE, ino_out) != OK) {
         return IOERR;
@@ -177,7 +176,7 @@ int yfs_client::create(inum parent, const char *name, mode_t mode,
 
 int yfs_client::mkdir(inum parent, const char *name, mode_t mode,
                       inum &ino_out) {
-    std::cout << "[YC] [MKDIR] " << name << " at " << parent << "\n";
+    // std::cout << "[YC] [MKDIR] " << name << " at " << parent << "\n";
     int r = OK;
 
     /*
@@ -205,7 +204,7 @@ int yfs_client::mkdir(inum parent, const char *name, mode_t mode,
 
 int yfs_client::lookup(inum parent, const char *name, bool &found,
                        inum &ino_out) {
-    std::cout << "[YC] [LOOKUP] " << name << " in " << parent << '\n';
+    // std::cout << "[YC] [LOOKUP] " << name << " in " << parent << '\n';
     int r = NOENT;
 
     /*
@@ -214,41 +213,48 @@ int yfs_client::lookup(inum parent, const char *name, bool &found,
      * you should design the format of directory content.
      */
     if (!isdir(parent)) return NOENT;
-    std::list<dirent> flist;
-    if (readdir(parent, flist) != OK) return IOERR;
-    std::cout << "\t[YC] [LOOKUP] "
-              << "readdir OK\n";
-    for (std::list<dirent>::iterator it = flist.begin(); it != flist.end();
-         it++) {
-        if (name == it->name) {
+
+    status s;
+    std::string buf;
+    if ((s = (ec->get(parent, buf))) != OK) {
+        // std::cout << "[YC] [READDIR] !ERR " << s << "\n";
+        return s;
+    }
+
+    while (!buf.empty()) {
+        size_t pos = buf.find('/');
+        std::string fname = buf.substr(0, pos);
+        buf.erase(0, pos + 1);
+        pos = buf.find('/');
+        std::string ino = (buf.substr(0, pos));
+        buf.erase(0, pos + 1);
+        if (fname == name) {
             r = OK;
             found = true;
-            ino_out = it->inum;
-            std::cout << "yc: lookup found " << ino_out << "\n";
+            ino_out = atoi(ino.c_str());
             break;
         }
     }
+
     return r;
 }
 
 int yfs_client::readdir(inum dir, std::list<dirent> &list) {
-    std::cout << "[YC] [READDIR] " << dir << "\n";
+    // std::cout << "[YC] [READDIR] " << dir << "\n";
     int r = OK;
 
     /*
      * your code goes here.
-     * note: you should parse the dirctory content using your defined format,
+     * note: you should parse the directory content using your defined format,
      * and push the dirents to the list.
      */
     std::string buf;
     status s;
     if ((s = (ec->get(dir, buf))) != OK) {
-        std::cout << "[YC] [READDIR] !ERR " << s << "\n";
+        // std::cout << "[YC] [READDIR] !ERR " << s << "\n";
         return s;
     }
-    // std::cout << "\t[YC] [READDIR] "
-    //           << "get OK\n";
-    std::cout << buf << "<<\n";
+
     if (isdir(dir)) {
         while (!buf.empty()) {
             size_t pos = buf.find('/');
@@ -259,23 +265,21 @@ int yfs_client::readdir(inum dir, std::list<dirent> &list) {
             buf.erase(0, pos + 1);
             dirent e;
             e.name = fname;
-            e.inum = n2i(ino);
+            e.inum = atoi(ino.c_str());
             list.push_back(e);
-            std::cout << "\tdir ent: " << e.name << "\t" << e.inum << "\n";
+            // std::cout << "\tdir ent: " << e.name << "\t" << e.inum << //
+            // "\n";
         }
-    } else if (is_symlink(dir)) {
-        std::cout << "\t Read symlink dir!\n";
     } else {
-        std::cout << "!!!!!!!!!!!!!!!readdir call to a file!\n";
+        std::cout << "!!!!!!!!!!!!!!!readdir call to a file or symlink!\n";
     }
-    std::cout << "\t[YC] [READDIR] "
-              << "build list OK\n";
+    // std::cout << "\t[YC] [READDIR] " << "build list OK\n";
     return r;
 }
 
 int yfs_client::read(inum ino, size_t size, off_t off, std::string &data) {
-    std::cout << "[YC] [READ] " << ino << " size=" << size << " off=" << off
-              << "\n";
+    // std::cout << "[YC] [READ] " << ino << " size=" << size << " off=" << off
+    //           << "\n";
     int r = OK;
 
     /*
@@ -289,14 +293,15 @@ int yfs_client::read(inum ino, size_t size, off_t off, std::string &data) {
         data = "";
     else
         data = buf.substr(off, size);
-    std::cout << "data read " << data.size() << " bytes : \n" << data << "<\n";
+    // std::cout << "data read " << data.size() << " bytes : \n" << data <<
+    // "<\n";
     return r;
 }
 
 int yfs_client::write(inum ino, size_t size, off_t off, const char *data,
                       size_t &bytes_written) {
-    std::cout << "[yc] [write] " << ino << " size=" << size << " off=" << off
-              << "\n";
+    // std::cout << "[yc] [write] " << ino << " size=" << size << " off=" << off
+    //           << "\n";
     int r = OK;
 
     /*
@@ -306,29 +311,27 @@ int yfs_client::write(inum ino, size_t size, off_t off, const char *data,
      */
     std::string buf;
     r = ec->get(ino, buf);
-    std::cout << "origin size " << buf.size() << " original content:\n";
+    // std::cout << "origin size " << buf.size() << " original content:\n";
     //   << buf << "|||\n";
     if (off > (long)buf.size()) {
-        std::string tmp = "";
-        tmp.assign(data, size);
+        std::string tmp(data, size);
         std::string new_data = std::string(off - buf.size(), '\0') + tmp;
         buf = buf + new_data;
         bytes_written = new_data.length();
-        std::cout << "write beyond buf, add 0's newsize=" << buf.size()
-                  << " and buf is:\n"
-                  << buf << std::endl;
+        // std::cout << "write beyond buf, add 0's newsize=" << buf.size()
+        //           << " and buf is:\n"
+        //           << buf << std::endl;
     } else {
-        std::string new_data;
-        new_data.assign(data, size);
-        std::cout << "using replace policy size=" << size
-                  << " data.size()=" << new_data.size() << std::endl;
+        std::string new_data(data, size);
+        // std::cout << "using replace policy size=" << size
+        //           << " data.size()=" << new_data.size() << std::endl;
         buf.replace(off, size, new_data.substr(0, size));
         bytes_written = size;
     }
     // setattr(ino, buf.size());
     r = ec->put(ino, buf);
-    std::cout << bytes_written << " bytes written, now size " << buf.size()
-              << " r=" << r << "\n";
+    // std::cout << bytes_written << " bytes written, now size " << buf.size()
+    //           << " r=" << r << "\n";
     //   << " updated:\n";
     //   << buf << "|||\n";
     return r;
@@ -371,8 +374,8 @@ int yfs_client::unlink(inum parent, const char *name) {
 
 int yfs_client::symlink(const char *link, inum parent, const char *name,
                         inum &ino_out) {
-    std::cout << "[YC] [SYMLINK]" << parent << " " << name << " " << link
-              << "\n";
+    // std::cout << "[YC] [SYMLINK]" << parent << " " << name << " " << link
+    //           << "\n";
     // create a new file, write path(link) into it
     int r = OK;
 
@@ -388,27 +391,19 @@ int yfs_client::symlink(const char *link, inum parent, const char *name,
     buf.append(to_str(std::string(name), ino_out));
     ec->put(parent, buf);
 
-    std::cout << "\t Create symlink file in parent ok\n";
+    // std::cout << "\t Create symlink file in parent ok\n";
     size_t written = 0;
     r = write(ino_out, strlen(link), 0, link, written);
-    std::cout << "\t symlink returned " << r << "\n";
+    // std::cout << "\t symlink returned " << r << "\n";
     return r;
 }
 
 std::string yfs_client::to_str(std::string fname, inum ino) {
     std::string package(fname);
-    package.push_back('/');
-    package.append(this->filename(ino) + "/");
+    char buf[16];
+    sprintf(buf, "/%llu/", ino);
+    package.append(buf);
     return package;
-}
-
-std::string yfs_client::get_filename(std::string buf) {
-    return buf.substr(0, buf.find('/'));
-}
-
-yfs_client::inum yfs_client::get_ino(std::string buf) {
-    size_t pos = buf.find('/');
-    return get_ino(buf.substr(pos + 1));
 }
 
 int yfs_client::path_to_inum(std::string path, inum &ino_out) {
@@ -419,7 +414,6 @@ int yfs_client::path_to_inum(std::string path, inum &ino_out) {
     while (!target.empty()) {
         size_t pos = target.find('/');
         std::string ent = target.substr(0, pos);
-        // cout << ent << "\n";
         if (pos == std::string::npos) pos = target.size() - 1;
         target.erase(0, pos + 1);
         readdir(p, dirlist);
