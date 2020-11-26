@@ -17,9 +17,8 @@ extent_server::extent_server()
 int extent_server::create(uint32_t type, extent_protocol::extentid_t &id)
 {
   // alloc a new inode and return inum
-  printf(">extent_server: create inode\n");
   id = im->alloc_inode(type);
-  printf("<extent_server: create inode\n");
+  printf("extent_server: create inode %llu\n", id);
 
   return extent_protocol::OK;
 }
@@ -31,7 +30,7 @@ int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &)
   const char * cbuf = buf.c_str();
   int size = static_cast<int>(buf.size());
   im->write_file(id, cbuf, size);
-  printf("<extent_server: put %llu\n", id);
+  printf("<extent_server: put inode=%llu, %u bytes\n", id, size);
   return extent_protocol::OK;
 }
 
