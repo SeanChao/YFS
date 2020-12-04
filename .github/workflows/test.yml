@@ -3,13 +3,15 @@ name: Tests
 on: push
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - name: Setup
-        run: docker pull ddnirvana/cselab_env:latest
-      - name: Test
-        run: |
-          ls -la
-          sudo docker run --privileged --cap-add=ALL -u root -v ${PWD}:/labenv ddnirvana/cselab_env:latest bash "./ci-test.sh"
+        run: sudo apt-get install libfuse-dev
+      - name: Build
+        run: make -j
+      - name: Test Lock
+        run: ./grade_lab2.sh
+      - name: Test YDB
+        run: ./grade_lab3.sh

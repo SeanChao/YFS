@@ -1,5 +1,31 @@
 #ifndef ydb_server_h
 #define ydb_server_h
+#define DEBUG 1
+#ifdef DEBUG
+
+#include <iostream>
+#include <mutex>
+#include <sstream>
+class PrintThread : public std::ostringstream {
+   public:
+    PrintThread() = default;
+
+    ~PrintThread() {
+        std::lock_guard<std::mutex> guard(_mutexPrint);
+        std::cout << this->str();
+    }
+
+   private:
+    static std::mutex _mutexPrint;
+};
+
+// #define LOG(x) std::cout << pthread_self() % 7 << " " << x
+#define LOG(x) PrintThread{} << pthread_self() % 7 << " " << x
+#else
+#define LOG(x) \
+    do {       \
+    } while (0)
+#endif
 
 #include <map>
 #include <set>
@@ -11,16 +37,18 @@
 #include "lock_client_cache.h"
 #include "lock_protocol.h"
 #include "ydb_protocol.h"
-    typedef extent_protocol::extentid_t eid_t;
+typedef extent_protocol::extentid_t eid_t;
 class ydb_server {
    protected:
-
     static const eid_t superNodeId = 1;
     extent_client *ec;
     lock_client *lc;
 
-    ydb_protocol::status create(eid_t key, eid_t &id);
     eid_t getInum(eid_t key);
+
+    enum transactionState { NONE, STARTED, COMMITTED, ABORTED };
+    std::map<ydb_protocol::transaction_id, transactionState> txState;
+    bool txUpdateable(ydb_protocol::transaction_id id) const;
 
    public:
     ydb_server(std::string, std::string);
@@ -38,12 +66,7 @@ class ydb_server {
                                      int &);
     virtual ydb_protocol::status del(ydb_protocol::transaction_id,
                                      const std::string, int &);
-
     static extent_protocol::extentid_t hashKey(const std::string key);
-
-   private:
-    std::map<extent_protocol::extentid_t, extent_protocol::extentid_t>
-        key2fileMap;
 };
 
 #endif

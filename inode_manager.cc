@@ -134,7 +134,8 @@ uint32_t inode_manager::alloc_inode(uint32_t type) {
     // Find a free inode in inode table
     uint32_t upbound = bm->sb.ninodes - 1;
     // FIXME: dead loop when blocks are used up
-    while (true) {
+    size_t iter = 0;
+    while (++iter <= bm->sb.ninodes) {
         uint32_t i = 1 + rand() % upbound;
         inode_buf = get_inode(i);
         if (inode_buf == NULL) {
@@ -251,7 +252,7 @@ void inode_manager::read_file(uint32_t inum, char **buf_out, int *size) {
     std::time_t time = std::time(NULL);
     ino->atime = (unsigned int)time;
     put_inode(inum, ino);
-        pthread_mutex_unlock(&lock);
+    pthread_mutex_unlock(&lock);
     return;
 }
 
@@ -277,6 +278,12 @@ void inode_manager::write_file(uint32_t inum, const char *buf, int size) {
     }
     int o_blk_num = NBLK(ino->size);
     int new_blk_num = NBLK(size);
+    // Make a copy of data, when accessing this data as multiple BLOCK_SIZE
+    // blocks, it's possible to access past the boundary of memory, leading to
+    // segmentation fault
+    char *copy = (char *)calloc(new_blk_num, BLOCK_SIZE);
+    memcpy(copy, buf, size);
+    buf = copy;
     if (new_blk_num > o_blk_num) {
         // Allocate new block
         int addition = new_blk_num - o_blk_num;

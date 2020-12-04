@@ -15,6 +15,7 @@
 lock_server_cache::lock_server_cache() {
     rpc = new handle("");
     pthread_mutex_init(&lock, NULL);
+    tprintf("* lock server started (cached)\n");
 }
 
 lock_server_cache::~lock_server_cache() {
@@ -27,8 +28,6 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string id,
     // Your lab2 part3 code goes here
     pthread_mutex_lock(&lock);
     tprintf("[%llu] [%s] ACQ\n", lid, id.c_str());
-    std::map<lock_protocol::lockid_t, pthread_cond_t>::iterator cit =
-        lock_cv.find(lid);
     std::map<lock_protocol::lockid_t, lock_info>::iterator it = info.find(lid);
     if (it == info.end()) info[lid] = lock_info(lid);  // properly init
     lock_info &li = info[lid];

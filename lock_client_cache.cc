@@ -190,9 +190,5 @@ bool lock_client_cache::check() {
         std::cout << "revoke recv " << i->first << " " << i->second << std::endl;
     }
     std::cout << "last locked: " << last_locked << "\n";
-    // try lock and unlock
-    // pthread_mutex_lock(&mutex);
-    // std::cout << "LOCK OK";
-    // pthread_mutex_unlock(&mutex);
-    // std::cout << " UNLOCK OK\n";
+    return true;
 }

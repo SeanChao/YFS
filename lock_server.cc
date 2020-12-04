@@ -23,14 +23,16 @@ multiple clients request the same lock, the lock server must grant the lock to
 one client at a time.
  */
 
-lock_server::lock_server() : nacquire(0) {}
+lock_server::lock_server() : nacquire(0) {
+    printf("* lock server started");
+    pthread_mutex_init(&lock, NULL);
+}
 
 lock_protocol::status lock_server::stat(int clt, lock_protocol::lockid_t lid,
                                         int &r) {
     lock_protocol::status ret = lock_protocol::OK;
     printf("stat request from clt %d\n", clt);
     r = nacquire;
-    pthread_mutex_init(&lock, NULL);
     pthread_mutex_lock(&lock);
     r = this->lock_state[lid];
     pthread_mutex_unlock(&lock);
@@ -42,8 +44,7 @@ lock_protocol::status lock_server::acquire(int clt, lock_protocol::lockid_t lid,
     lock_protocol::status ret = lock_protocol::OK;
     std::cout << "ACQ " << lid << std::endl;
     pthread_mutex_lock(&lock);
-    std::cout << "get global lock ok"
-              << "\n";
+    std::cout << "get global lock ok\n";
     std::map<lock_protocol::lockid_t, pthread_cond_t>::iterator cit =
         lock_cv.find(lid);
     if (cit == lock_cv.end()) {
@@ -51,7 +52,8 @@ lock_protocol::status lock_server::acquire(int clt, lock_protocol::lockid_t lid,
         lock_state[lid]++;
         pthread_cond_init(&(lock_cv[lid]), NULL);
     } else {
-        std::cout << "SERVER waiting for cv " << lid << " lock state " << lock_state[lid] << " to " << clt << "\n";
+        std::cout << "SERVER waiting for cv " << lid << " lock state "
+                  << lock_state[lid] << " to " << clt << "\n";
         // No race condition since lock_state is locked
         while (lock_state[lid] > 0) pthread_cond_wait(&(cit->second), &lock);
         lock_state[lid]++;

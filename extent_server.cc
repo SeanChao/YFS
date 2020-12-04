@@ -27,7 +27,7 @@ int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &)
 {
   printf(">extent_server: put %llu\n", id);
   id &= 0x7fffffff;
-  const char * cbuf = buf.c_str();
+  const char * cbuf = buf.data();
   int size = static_cast<int>(buf.size());
   im->write_file(id, cbuf, size);
   printf("<extent_server: put inode=%llu, %u bytes\n", id, size);
