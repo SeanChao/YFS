@@ -17,8 +17,8 @@
 int nt = 6; //XXX: lab1's rpc handlers are blocking. Since rpcs uses a thread pool of 10 threads, we cannot test more than 10 blocking rpc.
 std::string dst;
 // Lab2: Use lock_client_cache when you test lock_cache
-lock_client **lc = new lock_client * [nt];
-// lock_client_cache **lc = new lock_client_cache * [nt];
+// lock_client **lc = new lock_client * [nt];
+lock_client_cache **lc = new lock_client_cache * [nt];
 lock_protocol::lockid_t a = 1;
 lock_protocol::lockid_t b = 2;
 lock_protocol::lockid_t c = 3;
@@ -104,7 +104,7 @@ test3(void *x)
   for (int j = 0; j < 10; j++) {
     lc[i]->acquire(a);
     check_grant(a);
-    printf ("test3: client %d got lock\n", i);
+    printf ("test3: client %d got lock (%d)\n", i, j);
     check_release(a);
     lc[i]->release(a);
   }
@@ -176,8 +176,8 @@ main(int argc, char *argv[])
     VERIFY(pthread_mutex_init(&count_mutex, NULL) == 0);
     printf("lock client\n");
     // Lab2: Use lock_client_cache when you test lock_cache
-    for (int i = 0; i < nt; i++) lc[i] = new lock_client(dst);
-    // for (int i = 0; i < nt; i++) lc[i] = new lock_client_cache(dst);
+    // for (int i = 0; i < nt; i++) lc[i] = new lock_client(dst);
+    for (int i = 0; i < nt; i++) lc[i] = new lock_client_cache(dst);
 
     if(!test || test == 1){
       test1();
@@ -191,10 +191,10 @@ main(int argc, char *argv[])
 	VERIFY (r == 0);
       }
       for (int i = 0; i < nt; i++) {
-	pthread_join(th[i], NULL);
+          pthread_join(th[i], NULL);
       }
     }
-
+    
     if(!test || test == 3){
       printf("test 3\n");
 
