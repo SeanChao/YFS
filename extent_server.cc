@@ -25,7 +25,8 @@ int extent_server::create(uint32_t type, extent_protocol::extentid_t &id)
 
 int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &)
 {
-  printf(">extent_server: put %llu\n", id);
+
+  // printf("extent_server: put %lld\n", id);
   id &= 0x7fffffff;
   const char * cbuf = buf.data();
   int size = static_cast<int>(buf.size());
@@ -36,7 +37,7 @@ int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &)
 
 int extent_server::get(extent_protocol::extentid_t id, std::string &buf)
 {
-  printf(">extent_server: get %llu\n", id);
+  // printf("extent_server: get %lld\n", id);
 
   id &= 0x7fffffff;
 
@@ -47,7 +48,8 @@ int extent_server::get(extent_protocol::extentid_t id, std::string &buf)
   if (size == 0)
     buf = "";
   else {
-    buf.assign(cbuf, size);
+    // buf.assign(cbuf, size);
+    buf = std::string(cbuf, size);
     free(cbuf);
   }
 
@@ -57,7 +59,7 @@ int extent_server::get(extent_protocol::extentid_t id, std::string &buf)
 
 int extent_server::getattr(extent_protocol::extentid_t id, extent_protocol::attr &a)
 {
-  printf(">extent_server: getattr %lld\n", id);
+  // printf("extent_server: getattr %lld\n", id);
 
   id &= 0x7fffffff;
   
@@ -72,7 +74,7 @@ int extent_server::getattr(extent_protocol::extentid_t id, extent_protocol::attr
 
 int extent_server::remove(extent_protocol::extentid_t id, int &)
 {
-  printf(">extent_server: remove %lld\n", id);
+  // printf("extent_server: remove %lld\n", id);
 
   id &= 0x7fffffff;
   im->remove_file(id);

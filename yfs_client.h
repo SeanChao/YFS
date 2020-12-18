@@ -41,13 +41,13 @@ class yfs_client {
    private:
     static std::string filename(inum);
     static inum n2i(std::string);
-    bool is_type(inum inum, extent_protocol::types type) const;
+    bool is_type(inum inum, extent_protocol::types type) ;
+    uint32_t get_type(inum inum) ;
 
     std::string to_str(std::string filename, inum ino);
-    std::string get_filename(std::string buf);
-    static inum get_ino(std::string buf);
 
     int path_to_inum(std::string path, inum &ino_out);
+    std::map<unsigned long long, uint32_t> inum2tyCache;
 
    public:
     yfs_client();

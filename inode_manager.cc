@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <sys/types.h>
+#include <pthread.h>
 #include <unistd.h>
 
 #include <cstring>
@@ -13,14 +14,14 @@ disk::disk() {
     bzero(blocks, sizeof(blocks));
 }
 
-void disk::read_block(blockid_t id, char *buf) {
-    if (id < 0 || id >= BLOCK_NUM || buf == NULL) return;
+inline void disk::read_block(blockid_t id, char *buf) {
+    // if (id < 0 || id >= BLOCK_NUM || buf == NULL) return;
 
     memcpy(buf, blocks[id], BLOCK_SIZE);
 }
 
-void disk::write_block(blockid_t id, const char *buf) {
-    if (id < 0 || id >= BLOCK_NUM || buf == NULL) return;
+inline void disk::write_block(blockid_t id, const char *buf) {
+    // if (id < 0 || id >= BLOCK_NUM || buf == NULL) return;
 
     memcpy(blocks[id], buf, BLOCK_SIZE);
 }
@@ -34,14 +35,19 @@ blockid_t block_manager::alloc_block() {
      * you need to think about which block you can start to be allocated.
      */
     // iterate throught the bit map to find a free block
+    // uint32_t bitmap_blocks = BLOCK_NUM / BPB;
+    // uint32_t inode_table_blocks = INODE_NUM / IPB;
+    // uint32_t reserved = 2 + bitmap_blocks + inode_table_blocks;
+    const uint32_t reserved = 2 + BLOCK_NUM / BPB + INODE_NUM / IPB;
     blockid_t free_block_id = BLOCK_NUM;
     pthread_mutex_lock(&lock);
-    for (std::map<uint32_t, int>::iterator it = using_blocks.begin();
-         it != using_blocks.end(); it++) {
-        if (it->second == 0) {
-            free_block_id = it->first;
-            it->second = 1;
-            break;
+    std::vector<int>::iterator end = using_blocks.end();
+    std::vector<int>::iterator it = using_blocks.begin();
+    std::advance(it, reserved);
+    for (; it != end; it++) {
+        if (*it == 0) {
+            *it = 1;
+            return it - using_blocks.begin();
         }
     }
     pthread_mutex_unlock(&lock);
@@ -71,9 +77,7 @@ block_manager::block_manager() {
     sb.ninodes = INODE_NUM;
 
     // init free block map
-    for (blockid_t i = 0; i < BLOCK_NUM; i++) {
-        using_blocks[i] = 0;
-    }
+    using_blocks = std::vector<int>(BLOCK_NUM, 0);
 
     uint32_t bitmap_blocks = BLOCK_NUM / BPB;
     uint32_t inode_table_blocks = INODE_NUM / IPB;
@@ -82,7 +86,7 @@ block_manager::block_manager() {
     pthread_mutex_init(&lock, NULL);
 }
 
-void block_manager::read_block(uint32_t id, char *buf) {
+inline void block_manager::read_block(uint32_t id, char *buf) {
     d->read_block(id, buf);
 }
 
@@ -139,7 +143,7 @@ uint32_t inode_manager::alloc_inode(uint32_t type) {
         uint32_t i = 1 + rand() % upbound;
         inode_buf = get_inode(i);
         if (inode_buf == NULL) {
-            printf("> im: alloc_inode %d\n", i);
+            // printf("> im: alloc_inode %d\n", i);
             inode_t ino;
             ino.type = type;
             ino.size = 0;
@@ -186,17 +190,16 @@ struct inode *inode_manager::get_inode(uint32_t inum) {
 
     // printf("\tim: get_inode %d\n", inum);
 
-    if (inum < 0 || inum >= INODE_NUM) {
-        printf("\tim: inum out of range\n");
-        return NULL;
-    }
+    // if (inum < 0 || inum >= INODE_NUM) {
+    //     printf("\tim: inum out of range\n");
+    //     return NULL;
+    // }
 
     bm->read_block(IBLOCK(inum, bm->sb.nblocks), buf);
-    // printf("%s:%d\n", __FILE__, __LINE__);
 
-    ino_disk = (struct inode *)buf + inum % IPB;
+    ino_disk = (struct inode *)buf;
     if (ino_disk->type == 0) {
-        printf("\tim: inode not exist\n");
+        // printf("\tim: inode not exist\n");
         return NULL;
     }
 
@@ -240,8 +243,7 @@ void inode_manager::read_file(uint32_t inum, char **buf_out, int *size) {
     }
     *size = ino->size;
     int nblk = NBLK(ino->size);
-    char *tmp = (char *)malloc(sizeof(char) * (nblk * BLOCK_SIZE));
-    // printf("\tmalloc ok\n");
+    char *tmp = (char *)malloc((nblk * BLOCK_SIZE));
     int block_idx;
     for (block_idx = 0; block_idx < nblk; block_idx++) {
         blockid_t bid = get_inode_block(ino, block_idx);
@@ -253,6 +255,7 @@ void inode_manager::read_file(uint32_t inum, char **buf_out, int *size) {
     ino->atime = (unsigned int)time;
     put_inode(inum, ino);
     pthread_mutex_unlock(&lock);
+    free(ino);
     return;
 }
 
@@ -285,25 +288,32 @@ void inode_manager::write_file(uint32_t inum, const char *buf, int size) {
     memcpy(copy, buf, size);
     buf = copy;
     if (new_blk_num > o_blk_num) {
-        // Allocate new block
-        int addition = new_blk_num - o_blk_num;
-        for (int i = 0; i < addition; i++) {
-            std::cout << ".";
+        int i;
+        int di_addition = new_blk_num < NDIRECT ? new_blk_num : NDIRECT;
+        for (i = o_blk_num; i < di_addition; i++) {
             blockid_t bid = bm->alloc_block();
-            if (o_blk_num + i < NDIRECT)
-                ino->blocks[o_blk_num + i] = bid;
-            else {
-                if (o_blk_num + i == NDIRECT) {
-                    blockid_t id = bm->alloc_block();
-                    ino->blocks[NDIRECT] = id;
-                }
-                blockid_t indirect_id = ino->blocks[NDIRECT];
+            ino->blocks[i] = bid;
+        }
+        if (i < new_blk_num) {
+            ino->blocks[NDIRECT] = bm->alloc_block();
+        }
+        if (i < new_blk_num) {
+            blockid_t indirect_id = ino->blocks[NDIRECT];
+            char buf[BLOCK_SIZE];
+            bm->read_block(indirect_id, buf);
+            // Unrolling
+            while (i + 1 < new_blk_num) {
                 blockid_t id = bm->alloc_block();
-                char buf[BLOCK_SIZE];
-                bm->read_block(indirect_id, buf);
-                ((blockid_t *)buf)[o_blk_num + i - NDIRECT] = id;
-                bm->write_block(indirect_id, buf);
+                blockid_t id2 = bm->alloc_block();
+                ((blockid_t *)buf)[i - NDIRECT] = id;
+                ((blockid_t *)buf)[i + 1 - NDIRECT] = id2;
+                i += 2;
             }
+            if (i < new_blk_num) {
+                blockid_t id = bm->alloc_block();
+                ((blockid_t *)buf)[i - NDIRECT] = id;
+            }
+            bm->write_block(indirect_id, buf);
         }
         std::cout << std::endl;
     } else if (new_blk_num < o_blk_num) {
@@ -330,6 +340,8 @@ void inode_manager::write_file(uint32_t inum, const char *buf, int size) {
     put_inode(inum, ino);
     std::cout << " im: write_file return" << std::endl;
     pthread_mutex_unlock(&lock);
+    // std::cout << " im: write_file return" << std::endl;
+    free(ino);
     return;
 }
 
@@ -350,7 +362,6 @@ void inode_manager::getattr(uint32_t inum, extent_protocol::attr &a) {
     a.ctime = ino->ctime;
     a.size = ino->size;
     free(ino);
-    return;
 }
 
 void inode_manager::remove_file(uint32_t inum) {
@@ -364,13 +375,15 @@ void inode_manager::remove_file(uint32_t inum) {
     if (ino == NULL) {
         printf("ERR! remove_file: inum not exist\n");
         pthread_mutex_unlock(&lock);
+        // printf("ERR! remove_file: inum not exist\n");
         return;
     }
     // freedom to blocks
     uint32_t size = ino->size;
     int nblk = NBLK(size);
     int block_idx;
-    for (block_idx = 0; block_idx < nblk && block_idx <= NDIRECT; block_idx++) {
+    int bound = nblk < NDIRECT ? nblk : NDIRECT;
+    for (block_idx = 0; block_idx < bound; block_idx++) {
         bm->free_block(ino->blocks[block_idx]);
     }
     // indirect read
@@ -389,6 +402,7 @@ void inode_manager::remove_file(uint32_t inum) {
     ino->mtime = time;
     put_inode(inum, ino);
     pthread_mutex_unlock(&lock);
+    free(ino);
     return;
 }
 

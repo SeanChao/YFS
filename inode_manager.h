@@ -5,6 +5,7 @@
 
 #include <pthread.h>
 #include <stdint.h>
+#include <pthread.h>
 
 #include "extent_protocol.h"  // TODO: delete it
 
@@ -39,7 +40,7 @@ class block_manager {
     disk *d;
     // for block manager itself, for inode layer it should look for the real
     // block
-    std::map<uint32_t, int> using_blocks;
+    std::vector<int> using_blocks;
     pthread_mutex_t lock;
 
    public:
