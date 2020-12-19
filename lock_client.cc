@@ -33,11 +33,11 @@ int lock_client::stat(lock_protocol::lockid_t lid) {
 lock_protocol::status lock_client::acquire(lock_protocol::lockid_t lid) {
     // Your lab2 part2 code goes here
     int r;
-    printf("CLIENT try to acqurie %lld\n", lid);
+    // printf("CLIENT try to acqurie %lld\n", lid);
     lock_protocol::status ret =
         cl->call(lock_protocol::acquire, cl->id(), lid, r);
     VERIFY(ret == lock_protocol::OK);
-    printf("CLIENT acquried %lld\n", lid);
+    // printf("CLIENT acquried %lld\n", lid);
     return r;
 }
 
@@ -47,6 +47,6 @@ lock_protocol::status lock_client::release(lock_protocol::lockid_t lid) {
     lock_protocol::status ret =
         cl->call(lock_protocol::release, cl->id(), lid, r);
     VERIFY(ret == lock_protocol::OK);
-    printf("CLIENT released %lld\n", lid);
+    // printf("CLIENT released %lld\n", lid);
     return r;
 }

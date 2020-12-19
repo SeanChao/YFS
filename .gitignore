@@ -19,6 +19,7 @@ yfs_client
 
 .devcontainer
 .vscode
+.idea
 
 # log and build files
 yfs_client1.log

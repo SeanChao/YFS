@@ -27,7 +27,7 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string id,
     lock_protocol::status ret = lock_protocol::OK;
     // Your lab2 part3 code goes here
     pthread_mutex_lock(&lock);
-    tprintf("[%llu] [%s] ACQ\n", lid, id.c_str());
+    // tprintf("[%llu] [%s] ACQ\n", lid, id.c_str());
     std::map<lock_protocol::lockid_t, lock_info>::iterator it = info.find(lid);
     if (it == info.end()) info[lid] = lock_info(lid);  // properly init
     lock_info &li = info[lid];
@@ -45,7 +45,7 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string id,
             handle h(li.holder_id);
             rpcc *cl = h.safebind();
             ret = lock_protocol::RPCERR;
-            tprintf("directly send revoke RPC\n");
+            // tprintf("directly send revoke RPC\n");
             if (cl) {
                 li.revoke_sent = true;
                 pthread_mutex_unlock(&lock);
@@ -67,7 +67,7 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string id,
             handle h(li.holder_id);
             rpcc *cl = h.safebind();
             ret = lock_protocol::RPCERR;
-            tprintf("[%llu] send revoke to %s\n", lid, li.holder_id.c_str());
+            // tprintf("[%llu] send revoke to %s\n", lid, li.holder_id.c_str());
             if (cl) {
                 int r;
                 li.revoke_sent = true;
@@ -75,7 +75,7 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string id,
                 ret = cl->call(rlock_protocol::revoke, lid, r);
                 pthread_mutex_lock(&lock);
             } else {
-                tprintf("revoke RPC failed");
+                // tprintf("revoke RPC failed");
             }
         }
         ret = lock_protocol::RETRY;
@@ -90,7 +90,7 @@ int lock_server_cache::release(lock_protocol::lockid_t lid, std::string id,
                                int &r) {
     lock_protocol::status ret = lock_protocol::OK;
     pthread_mutex_lock(&lock);
-    tprintf("[%llu] [%s] release lock\n", lid, id.c_str());
+    // tprintf("[%llu] [%s] release lock\n", lid, id.c_str());
     lock_info &li = info[lid];
     if (li.free || li.holder_id != id) {
         tprintf("ERR! lock is free or held by another %d %s\n", li.free,
@@ -106,7 +106,7 @@ int lock_server_cache::release(lock_protocol::lockid_t lid, std::string id,
         handle h(next);
         rpcc *cl = h.safebind();
         ret = lock_protocol::RPCERR;
-        tprintf("[%llu] send retry to %s\n", lid, next.c_str());
+        // tprintf("[%llu] send retry to %s\n", lid, next.c_str());
         if (cl) {
             int r;
             pthread_mutex_unlock(&lock);

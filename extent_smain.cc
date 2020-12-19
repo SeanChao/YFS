@@ -32,7 +32,7 @@ main(int argc, char *argv[])
   server.reg(extent_protocol::put, &ls, &extent_server::put);
   server.reg(extent_protocol::remove, &ls, &extent_server::remove);
   server.reg(extent_protocol::create, &ls, &extent_server::create);
-
+  server.reg(extent_protocol::fullget, &ls, &extent_server::fullget);
   while(1)
     sleep(1000);
 }

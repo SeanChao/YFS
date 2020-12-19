@@ -1,8 +1,8 @@
 #include "inode_manager.h"
 
 #include <math.h>
-#include <sys/types.h>
 #include <pthread.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <cstring>
@@ -47,6 +47,7 @@ blockid_t block_manager::alloc_block() {
     for (; it != end; it++) {
         if (*it == 0) {
             *it = 1;
+            pthread_mutex_unlock(&lock);
             return it - using_blocks.begin();
         }
     }
@@ -122,7 +123,7 @@ uint32_t inode_manager::alloc_inode(uint32_t type) {
     pthread_mutex_lock(&lock);
     // Allocate root dir (inode=1)
     if (get_inode(1) == NULL) {
-        printf("> im: alloc_inode root 1\n");
+        // printf("> im: alloc_inode root 1\n");
         inode_t ino;
         ino.type = type;
         ino.size = 0;
@@ -169,7 +170,6 @@ void inode_manager::free_inode(uint32_t inum) {
      */
     blockid_t inode_block_id = IBLOCK(inum, bm->sb.nblocks);
     char buf[BLOCK_SIZE];
-    // pthread_mutex_lock(&lock);
     bm->read_block(inode_block_id, buf);
     struct inode *ino = (struct inode *)buf;
     if (ino->type == 0) return;
@@ -178,7 +178,6 @@ void inode_manager::free_inode(uint32_t inum) {
     for (int i = 0; i < round(ino->size / (double)BLOCK_SIZE); i++) {
         bm->free_block(ino->blocks[i]);
     }
-    // pthread_mutex_unlock(&lock);
     return;
 }
 
@@ -216,12 +215,10 @@ void inode_manager::put_inode(uint32_t inum, struct inode *ino) {
     // printf("\tim: put_inode %d\n", inum);
     if (ino == NULL) return;
 
-    // pthread_mutex_lock(&lock);
     bm->read_block(IBLOCK(inum, bm->sb.nblocks), buf);
     ino_disk = (struct inode *)buf + inum % IPB;
     *ino_disk = *ino;
     bm->write_block(IBLOCK(inum, bm->sb.nblocks), buf);
-    // pthread_mutex_unlock(&lock);
 }
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -315,7 +312,6 @@ void inode_manager::write_file(uint32_t inum, const char *buf, int size) {
             }
             bm->write_block(indirect_id, buf);
         }
-        std::cout << std::endl;
     } else if (new_blk_num < o_blk_num) {
         // free blocks
         int diff = o_blk_num - new_blk_num;
@@ -338,7 +334,7 @@ void inode_manager::write_file(uint32_t inum, const char *buf, int size) {
 
     // write back inode
     put_inode(inum, ino);
-    std::cout << " im: write_file return" << std::endl;
+    // std::cout << " im: write_file return" << std::endl;
     pthread_mutex_unlock(&lock);
     // std::cout << " im: write_file return" << std::endl;
     free(ino);
