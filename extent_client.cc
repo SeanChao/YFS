@@ -93,7 +93,7 @@ shared_ptr<cached_file> extent_client_cache::cachedGet(
 
 shared_ptr<cached_file> extent_client_cache::lookup(
     extent_protocol::extentid_t id) const {
-    if (!cache.contains(id)) return NULL;
+    if (cache.find(id) == cache.end()) return NULL;
     auto file = cache.at(id);
     return file;
 }
