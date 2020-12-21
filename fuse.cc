@@ -39,7 +39,7 @@ int id() {
 // less correct values for the access/modify/change times
 // (atime, mtime, and ctime), and correct values for file sizes.
 //
-yfs_client::status getattr(yfs_client::inum inum, struct stat &st) {
+yfs_client::status getattr(yfs_client::inum_t inum, struct stat &st) {
     yfs_client::status ret;
 
     bzero(&st, sizeof(st));
@@ -105,7 +105,7 @@ yfs_client::status getattr(yfs_client::inum inum, struct stat &st) {
 void fuseserver_getattr(fuse_req_t req, fuse_ino_t ino,
                         struct fuse_file_info *fi) {
     struct stat st;
-    yfs_client::inum inum = ino;  // req->in.h.nodeid;
+    yfs_client::inum_t inum = ino;  // req->in.h.nodeid;
     yfs_client::status ret;
 
     ret = getattr(inum, st);
@@ -249,7 +249,7 @@ yfs_client::status fuseserver_createhelper(fuse_ino_t parent, const char *name,
     e->entry_timeout = 0.0;
     e->generation = 0;
 
-    yfs_client::inum inum;
+    yfs_client::inum_t inum;
     if (type == extent_protocol::T_FILE)
         ret = yfs->create(parent, name, mode, inum);
     else
@@ -308,7 +308,7 @@ void fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
     e.generation = 0;
     bool found = false;
 
-    yfs_client::inum ino;
+    yfs_client::inum_t ino;
     yfs->lookup(parent, name, found, ino);
 
     if (found) {
@@ -356,7 +356,7 @@ int reply_buf_limited(fuse_req_t req, const char *buf, size_t bufsize,
 //
 void fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
                         struct fuse_file_info *fi) {
-    yfs_client::inum inum = ino;  // req->in.h.nodeid;
+    yfs_client::inum_t inum = ino;  // req->in.h.nodeid;
     struct dirbuf b;
 
     // printf("fuseserver_readdir\n");

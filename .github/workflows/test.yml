@@ -8,7 +8,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Setup
-        run: sudo apt-get install libfuse-dev
+        run: |
+          sudo apt-get install libfuse-dev
+          git clone https://github.com/sslab-gatech/fxmark.git && cd fxmark && make -j
       - name: Build
         run: make -j
       - name: Test Lock
@@ -19,4 +21,4 @@ jobs:
         run: ./grade_lab3.sh
       - name: Benchmark YFS performance
         continue-on-error: true
-        run: ./grade_lab4.sh
+        run: ./stop.sh; ./start.sh && ./fxmark/bin/fxmark --type=YFS --root=./yfs1 --ncore=1 --duration=1; ./stop.sh

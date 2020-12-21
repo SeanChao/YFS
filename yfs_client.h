@@ -17,7 +17,7 @@
 
 class yfs_client {
    public:
-    typedef unsigned long long inum;
+    typedef unsigned long long inum_t;
     enum xxstatus { OK, RPCERR, NOENT, IOERR, EXIST };
     typedef int status;
 
@@ -34,7 +34,7 @@ class yfs_client {
     };
     struct dirent {
         std::string name;
-        yfs_client::inum inum;
+        yfs_client::inum_t inum;
     };
 
    private:
@@ -42,43 +42,42 @@ class yfs_client {
     lock_client *lc;
     const extent_protocol::extentid_t rootId = 1;
 
-    static std::string filename(inum);
-    static inum n2i(std::string);
-    bool is_type(inum inum, extent_protocol::types type) ;
+    static std::string filename(inum_t);
+    static inum_t n2i(std::string);
 
-    std::string to_str(std::string filename, inum ino);
+    std::string to_str(std::string filename, inum_t ino);
 
-    int path_to_inum(std::string path, inum &ino_out);
-    void releaseLock(inum lockId);
+    int path_to_inum(std::string path, inum_t &ino_out);
+    void releaseLock(inum_t lockId);
 
    public:
     yfs_client();
     yfs_client(std::string, std::string);
 
-    bool isfile(inum);
-    bool isdir(inum);
-    bool is_symlink(inum);
-    bool is_type(inum, extent_protocol::types) const;
-    uint32_t get_type(inum inum) const;
+    bool isfile(inum_t);
+    bool isdir(inum_t);
+    bool is_symlink(inum_t);
+    bool is_type(inum_t, extent_protocol::types) const;
+    uint32_t get_type(inum_t inum) const;
 
-    int getfile(inum, fileinfo &);
-    int getdir(inum, dirinfo &);
+    int getfile(inum_t, fileinfo &);
+    int getdir(inum_t, dirinfo &);
 
-    int setattr(inum, size_t);
-    int unlockedLookup(inum, const char *, bool &, inum &);
-    int lookup(inum, const char *, bool &, inum &);
-    int create(inum, const char *, mode_t, inum &);
-    int readdir(inum, std::list<dirent> &);
-    int unlockedReaddir(inum, std::list<dirent> &);
-    int write(inum, size_t, off_t, const char *, size_t &);
-    int read(inum, size_t, off_t, std::string &);
-    int unlink(inum, const char *);
-    int mkdir(inum, const char *, mode_t, inum &);
+    int setattr(inum_t, size_t);
+    int unlockedLookup(inum_t, const char *, bool &, inum_t &);
+    int lookup(inum_t, const char *, bool &, inum_t &);
+    int create(inum_t, const char *, mode_t, inum_t &);
+    int readdir(inum_t, std::list<dirent> &);
+    int unlockedReaddir(inum_t, std::list<dirent> &);
+    int write(inum_t, size_t, off_t, const char *, size_t &);
+    int read(inum_t, size_t, off_t, std::string &);
+    int unlink(inum_t, const char *);
+    int mkdir(inum_t, const char *, mode_t, inum_t &);
 
     /** you may need to add symbolic link related methods here.*/
-    int symlink(const char *link, inum ino, const char *name, inum &ino_out);
+    int symlink(const char *link, inum_t ino, const char *name, inum_t &ino_out);
     // readlink returns the path of symlink whose inode number is ino
-    int readlink(inum ino, std::string &path);
+    int readlink(inum_t ino, std::string &path);
 };
 
 #endif
