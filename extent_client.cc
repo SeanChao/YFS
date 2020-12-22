@@ -13,11 +13,11 @@
 using std::shared_ptr;
 using std::unique_ptr;
 
-#define DEBUG 42
+// #define DEBUG 42
 #ifdef DEBUG
 #define LOG(f_, ...) printf((f_), __VA_ARGS__)
 #else
-#define LOG(x) \
+#define LOG(f_, ...) \
     do {       \
     } while (0)
 #endif

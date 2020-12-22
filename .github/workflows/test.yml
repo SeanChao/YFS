@@ -12,13 +12,15 @@ jobs:
           sudo apt-get install libfuse-dev
           git clone https://github.com/sslab-gatech/fxmark.git && cd fxmark && make -j
       - name: Build
-        run: make -j
-      - name: Test Lock
+        run: make -j lab lab3
+      - name: Test YFS
         continue-on-error: true
         run: ./grade_lab2.sh
+      - name: special test for lab2-part1-b
+        run: ./start.sh && ./test-lab2-part1-b.pl ./yfs1; ./stop.sh
       - name: Test YDB
         continue-on-error: true
-        run: ./grade_lab3.sh
+        run: make lab3 && ./grade_lab3.sh
       - name: Benchmark YFS performance
         continue-on-error: true
         run: ./stop.sh; ./start.sh && ./fxmark/bin/fxmark --type=YFS --root=./yfs1 --ncore=1 --duration=1; ./stop.sh

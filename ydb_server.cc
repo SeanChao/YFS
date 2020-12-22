@@ -6,7 +6,7 @@
 
 // #define DEBUG 1
 
-// #define USE_CACHE
+#define USE_CACHE
 
 std::mutex PrintThread::_mutexPrint;
 
