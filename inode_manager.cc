@@ -138,7 +138,6 @@ uint32_t inode_manager::alloc_inode(uint32_t type) {
     // random choose:
     // Find a free inode in inode table
     uint32_t upbound = bm->sb.ninodes - 1;
-    // FIXME: dead loop when blocks are used up
     size_t iter = 0;
     while (++iter <= bm->sb.ninodes) {
         uint32_t i = 1 + rand() % upbound;
@@ -160,6 +159,47 @@ uint32_t inode_manager::alloc_inode(uint32_t type) {
     printf("!!! Failed to allocate an inode\n");
     pthread_mutex_unlock(&lock);
     return 1;
+}
+
+std::vector<extent_protocol::extentid_t> inode_manager::alloc_ninode(
+    uint32_t type, int n) {
+    inode_t *inode_buf;
+    pthread_mutex_lock(&lock);
+    // Allocate root dir (inode=1)
+    if (get_inode(1) == NULL) {
+        // printf("> im: alloc_inode root 1\n");
+        inode_t ino;
+        ino.type = type;
+        ino.size = 0;
+        std::time_t time = std::time(NULL);
+        ino.ctime = time;
+        ino.atime = time;
+        ino.mtime = time;
+        put_inode(1, &ino);
+    }
+    // random choose: Find a free inode in inode table
+    uint32_t upbound = bm->sb.ninodes - 1;
+    size_t iter = 0;
+    std::vector<extent_protocol::extentid_t> inumArray;
+    while (++iter <= bm->sb.ninodes && n > 0) {
+        uint32_t i = 1 + rand() % upbound;
+        inode_buf = get_inode(i);
+        if (inode_buf == NULL) {
+            n--;
+            inode_t ino;
+            ino.type = type;
+            ino.size = 0;
+            std::time_t time = std::time(NULL);
+            ino.ctime = time;
+            ino.atime = time;
+            ino.mtime = time;
+            put_inode(i, &ino);
+            inumArray.push_back(i);
+        }
+    }
+    printf("!!! Failed to allocate an inode\n");
+    pthread_mutex_unlock(&lock);
+    return inumArray;
 }
 
 void inode_manager::free_inode(uint32_t inum) {

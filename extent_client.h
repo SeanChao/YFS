@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 #include "extent_protocol.h"
 #include "extent_server.h"
@@ -44,7 +45,11 @@ class cached_file {
 
 class extent_client_cache : public extent_client {
    private:
-    std::map<extent_protocol::extentid_t, std::shared_ptr<cached_file>> cache;
+    std::vector<extent_protocol::extentid_t> preallocated;
+
+    std::unordered_map<extent_protocol::extentid_t,
+                       std::shared_ptr<cached_file>>
+        cache;
     std::shared_ptr<cached_file> setCachedFileData(
         extent_protocol::extentid_t id, std::string &buf);
     std::shared_ptr<cached_file> setCachedFileAttr(
@@ -57,6 +62,8 @@ class extent_client_cache : public extent_client {
     extent_client_cache(std::string dst);
     extent_protocol::status create(uint32_t type,
                                    extent_protocol::extentid_t &eid);
+    extent_protocol::status create_n(uint32_t type,
+                                     extent_protocol::extentid_t &eid, int n);
     extent_protocol::status get(extent_protocol::extentid_t eid,
                                 std::string &buf);
     extent_protocol::status getattr(extent_protocol::extentid_t eid,
@@ -64,8 +71,6 @@ class extent_client_cache : public extent_client {
     extent_protocol::status put(extent_protocol::extentid_t eid,
                                 std::string buf);
     extent_protocol::status remove(extent_protocol::extentid_t eid);
-    extent_protocol::status fullget(extent_protocol::extentid_t eid,
-                                    std::string &buf);
     virtual extent_protocol::status flush(extent_protocol::extentid_t eid);
 };
 

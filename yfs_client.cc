@@ -73,7 +73,7 @@ bool yfs_client::is_symlink(inum_t inum) {
 int yfs_client::getfile(inum_t inum, fileinfo &fin) {
     int r = OK;
 
-    printf("[YC] getfile %016llx\n", inum);
+    // printf("[YC] getfile %016llx\n", inum);
     extent_protocol::attr a;
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
@@ -118,7 +118,7 @@ release:
 
 // Only support set size of attr
 int yfs_client::setattr(inum_t ino, size_t size) {
-    std::cout << "[YC] [SETATTR] " << ino << " " << size << "\n";
+    // std::cout << "[YC] [SETATTR] " << ino << " " << size << "\n";
     int r = OK;
 
     /*
@@ -145,7 +145,7 @@ int yfs_client::setattr(inum_t ino, size_t size) {
 int yfs_client::create(inum_t parent, const char *name, mode_t mode,
                        inum_t &ino_out) {
     lc->acquire(parent);
-    std::cout << "[YC] [CREATE] " << name << " at " << parent << std::endl;
+    // std::cout << "[YC] [CREATE] " << name << " at " << parent << std::endl;
     int r = OK;
     bool found = false;
     if (unlockedLookup(parent, name, found, ino_out) == OK && found) {
@@ -191,7 +191,7 @@ int yfs_client::create(inum_t parent, const char *name, mode_t mode,
 
 int yfs_client::mkdir(inum_t parent, const char *name, mode_t mode,
                       inum_t &ino_out) {
-    std::cout << "[YC] [MKDIR] " << name << " at " << parent << "\n";
+    // std::cout << "[YC] [MKDIR] " << name << " at " << parent << "\n";
     int r = OK;
     bool found = false;
     lc->acquire(parent);
@@ -227,7 +227,7 @@ int yfs_client::lookup(inum_t parent, const char *name, bool &found,
 
 int yfs_client::unlockedLookup(inum_t parent, const char *name, bool &found,
                                inum_t &ino_out) {
-    std::cout << "[YC] [LOOKUP] " << name << " in " << parent << '\n';
+    // std::cout << "[YC] [LOOKUP] " << name << " in " << parent << '\n';
     int r = NOENT;
 
     if (!isdir(parent)) return NOENT;
@@ -265,7 +265,7 @@ int yfs_client::readdir(inum_t dir, std::list<dirent> &list) {
 }
 
 int yfs_client::unlockedReaddir(inum_t dir, std::list<dirent> &list) {
-    std::cout << "[YC] [READDIR] " << dir << "\n";
+    // std::cout << "[YC] [READDIR] " << dir << "\n";
     int r = OK;
 
     /*
@@ -300,8 +300,8 @@ int yfs_client::unlockedReaddir(inum_t dir, std::list<dirent> &list) {
 }
 
 int yfs_client::read(inum_t ino, size_t size, off_t off, std::string &data) {
-    std::cout << "[YC] [READ] " << ino << " size=" << size << " off=" << off
-              << "\n";
+    // std::cout << "[YC] [READ] " << ino << " size=" << size << " off=" << off
+    //           << "\n";
     int r = OK;
     std::string buf;
     lc->acquire(ino);
@@ -318,8 +318,8 @@ int yfs_client::read(inum_t ino, size_t size, off_t off, std::string &data) {
 
 int yfs_client::write(inum_t ino, size_t size, off_t off, const char *data,
                       size_t &bytes_written) {
-    std::cout << "[yc] [write] " << ino << " size=" << size << " off=" << off
-              << "\n";
+    // std::cout << "[yc] [write] " << ino << " size=" << size << " off=" << off
+    //           << "\n";
     int r = OK;
     lc->acquire(ino);
 
@@ -334,7 +334,7 @@ int yfs_client::write(inum_t ino, size_t size, off_t off, const char *data,
     if (off > (long)buf.size()) {
         std::string tmp(data, size);
         std::string new_data = std::string(off - buf.size(), '\0') + tmp;
-        buf = buf + new_data;
+        buf += new_data;
         bytes_written = new_data.length();
         // std::cout << "write beyond buf, add 0's newsize=" << buf.size()
         //           << " and buf is:\n"
@@ -353,13 +353,12 @@ int yfs_client::write(inum_t ino, size_t size, off_t off, const char *data,
     //   << " updated:\n";
     //   << buf << "|||\n";
     releaseLock(ino);
-    std::cout << "write returned\n";
     return r;
 }
 
 int yfs_client::unlink(inum_t parent, const char *name) {
     lc->acquire(parent);
-    std::cout << "[YC] [UNLINK] parent " << parent << " " << name << std::endl;
+    // std::cout << "[YC] [UNLINK] parent " << parent << " " << name << std::endl;
     int r = OK;
 
     /*
@@ -467,6 +466,7 @@ int yfs_client::readlink(inum_t ino, std::string &path) {
 }
 
 void yfs_client::releaseLock(inum_t lockId) {
+    // Consistency insurance: writeback data when lock is released
     ec->flush(lockId);
     lc->release(lockId);
 }

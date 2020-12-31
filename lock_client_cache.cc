@@ -12,7 +12,7 @@
 #include "rpc.h"
 #include "tprintf.h"
 
-#define DEBUG
+// #define DEBUG
 #ifdef DEBUG
 #define LOG(x) printf(x)
 #else
@@ -55,7 +55,7 @@ lock_client_cache::lock_client_cache(std::string xdst,
 
 lock_protocol::status lock_client_cache::acquire(lock_protocol::lockid_t lid) {
     pthread_mutex_lock(&mutex);
-    last_locked = "acq";
+    // last_locked = "acq";
     // tprintf("%s acquire %llu\n", TID, lid);
     int ret = lock_protocol::OK;
     bool done = false;
@@ -66,14 +66,13 @@ lock_protocol::status lock_client_cache::acquire(lock_protocol::lockid_t lid) {
                 int r;
                 lock_state[lid] = ACQUIRING;
                 // tprintf("%s [lock %llu] [state %d] sending AC RPC\n", TID,
-                // lid,
-                //         lock_state[lid]);
+                // lid, lock_state[lid]);
                 // reset retry_received (this run is invoked by a retry)
                 if (retry_recv[lid]) retry_recv[lid] = false;
                 pthread_mutex_unlock(&mutex);
                 ret = cl->call(lock_protocol::acquire, lid, id, r);
                 pthread_mutex_lock(&mutex);
-                last_locked = "acq after rpc";
+                // last_locked = "acq after rpc";
                 // tprintf("%s ACQ RPC: %d\n", TID, ret);
                 switch (ret) {
                     case lock_protocol::OK:
@@ -125,7 +124,6 @@ lock_protocol::status lock_client_cache::release(lock_protocol::lockid_t lid) {
     int ret = lock_protocol::OK;
     // Your lab2 part3 code goes here
     pthread_mutex_lock(&mutex);
-    last_locked = "rel";
     if (lock_state[lid] == NONE) {
         // tprintf("%s release %llu (already released [NONE])\n", TID, lid);
         return lock_protocol::OK;
@@ -140,7 +138,6 @@ lock_protocol::status lock_client_cache::release(lock_protocol::lockid_t lid) {
         int r;  // no use
         ret = cl->call(lock_protocol::release, lid, id, r);
         pthread_mutex_lock(&mutex);
-        last_locked = "rel after rpc";
     } else {
         lock_state[lid] = FREE;
         pthread_cond_signal(&(lock_free[lid]));
@@ -154,7 +151,6 @@ rlock_protocol::status lock_client_cache::revoke_handler(
     lock_protocol::lockid_t lid, int &) {
     int ret = rlock_protocol::OK;
     pthread_mutex_lock(&mutex);
-    last_locked = "revoke";
     tprintf("%s <- revoke %llu\n", TID, lid);
     revoke_recv[lid] = true;
     if (lock_state[lid] == FREE) {
@@ -162,7 +158,6 @@ rlock_protocol::status lock_client_cache::revoke_handler(
         pthread_mutex_unlock(&mutex);
         release(lid);
         pthread_mutex_lock(&mutex);
-        last_locked = "revoke after release";
         pthread_mutex_unlock(&mutex);
         return rlock_protocol::OK;
     }
@@ -175,7 +170,6 @@ rlock_protocol::status lock_client_cache::retry_handler(
     int ret = rlock_protocol::OK;
     // Your lab2 part3 code goes here
     pthread_mutex_lock(&mutex);
-    last_locked = "retry";
     // tprintf("%s <- retry %llu\n", TID, lid);
     retry_recv[lid] = true;
     pthread_cond_signal(&(retry_cv[lid]));
@@ -184,7 +178,7 @@ rlock_protocol::status lock_client_cache::retry_handler(
 }
 
 bool lock_client_cache::check() {
-    for (std::map<lid_t, LOCK_STATE>::const_iterator i = lock_state.begin();
+    for (std::unordered_map<lid_t, LOCK_STATE>::const_iterator i = lock_state.begin();
          i != lock_state.end(); i++) {
         // std::cout << "lock " << i->first << ": " << i->second << std::endl;
     }

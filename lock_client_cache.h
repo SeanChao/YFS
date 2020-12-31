@@ -5,6 +5,8 @@
 #define lock_client_cache_h
 
 #include <string>
+#include "pthread.h"
+#include <unordered_map>
 
 #include "lang/verify.h"
 #include "lock_client.h"
@@ -30,12 +32,12 @@ class lock_client_cache : public lock_client {
     std::string id;
     pthread_mutex_t mutex;
     enum LOCK_STATE { NONE, FREE, ACQUIRING, LOCKED, RELEASING };
-    std::map<lid_t, LOCK_STATE> lock_state;
+    std::unordered_map<lid_t, LOCK_STATE> lock_state;
     std::map<lid_t, pthread_cond_t> retry_cv;  // cv: retry RPC
     std::map<lid_t, bool> retry_recv;
     std::map<lid_t, pthread_cond_t> lock_free;  // cv: the cached lock is free
     std::map<lid_t, bool> revoke_recv;  // if the lock had received revoke
-    std::string last_locked;
+    // std::string last_locked;
 
    public:
     static int last_port;

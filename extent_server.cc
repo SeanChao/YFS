@@ -11,15 +11,27 @@
 
 #include <sstream>
 
+#define PRE_ALLOC_NUM 128
+
 extent_server::extent_server() {
     im = new inode_manager();
 }
 
 int extent_server::create(uint32_t type, extent_protocol::extentid_t &id) {
-    // alloc a new inode and return inum
     id = im->alloc_inode(type);
     // printf("extent_server: create inode %llu\n", id);
 
+    return extent_protocol::OK;
+}
+
+int extent_server::create_n_file(
+    int n, std::vector<extent_protocol::extentid_t> &vec) {
+    if (preallocated.size() < (size_t)(n)) {
+        auto newVec = im->alloc_ninode(extent_protocol::T_FILE, 2 * n);
+        preallocated.insert(preallocated.end(), newVec.begin(), newVec.end());
+    }
+    vec.insert(vec.begin(), preallocated.end() - n, preallocated.end());
+    preallocated.erase(preallocated.end() - n, preallocated.end());
     return extent_protocol::OK;
 }
 
@@ -27,7 +39,7 @@ int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &) {
     // printf(">extent_server: put %llu\n", id);
     id &= 0x7fffffff;
     const char *cbuf = buf.data();
-    int size = static_cast<int>(buf.size());
+    int size = (int)(buf.size());
     im->write_file(id, cbuf, size);
     // printf("<extent_server: put inode=%llu, %u bytes\n", id, size);
     return extent_protocol::OK;
@@ -40,14 +52,14 @@ int extent_server::get(extent_protocol::extentid_t id, std::string &buf) {
     int size = 0;
     char *cbuf = NULL;
 
-  im->read_file(id, &cbuf, &size);
-  if (size == 0)
-    buf = "";
-  else {
-    // buf.assign(cbuf, size);
-    buf = std::string(cbuf, size);
-    free(cbuf);
-  }
+    im->read_file(id, &cbuf, &size);
+    if (size == 0)
+        buf = "";
+    else {
+        // buf.assign(cbuf, size);
+        buf = std::string(cbuf, size);
+        free(cbuf);
+    }
 
     // printf("<extent_server: get %llu\n", id);
     return extent_protocol::OK;
@@ -75,11 +87,5 @@ int extent_server::remove(extent_protocol::extentid_t id, int &) {
     im->remove_file(id);
 
     // printf("<extent_server: remove %lld\n", id);
-    return extent_protocol::OK;
-}
-
-int extent_server::fullget(extent_protocol::extentid_t id, std::string &buf) {
-    std::cout << "extent_server: fullget";
-    buf = "YES!";
     return extent_protocol::OK;
 }

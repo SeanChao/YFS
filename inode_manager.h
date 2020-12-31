@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <vector>
 
 #include "extent_protocol.h"  // TODO: delete it
 
@@ -100,6 +101,7 @@ class inode_manager {
    public:
     inode_manager();
     uint32_t alloc_inode(uint32_t type);
+    std::vector<extent_protocol::extentid_t> alloc_ninode(uint32_t type, int n);
     void free_inode(uint32_t inum);
     void read_file(uint32_t inum, char **buf, int *size);
     void write_file(uint32_t inum, const char *buf, int size);

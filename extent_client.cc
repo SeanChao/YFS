@@ -18,9 +18,11 @@ using std::unique_ptr;
 #define LOG(f_, ...) printf((f_), __VA_ARGS__)
 #else
 #define LOG(f_, ...) \
-    do {       \
+    do {             \
     } while (0)
 #endif
+
+#define PRE_CREATE_NUM 64
 
 extent_client::extent_client(std::string dst) {
     sockaddr_in dstsock;
@@ -131,8 +133,19 @@ extent_client_cache::extent_client_cache(std::string dst)
 extent_protocol::status extent_client_cache::create(
     uint32_t type, extent_protocol::extentid_t &eid) {
     extent_protocol::status st = extent_protocol::OK;
-    // RPC: get an id
-    st = extent_client::create(type, eid);
+    // pre-create for T_FILE
+    if (type == extent_protocol::T_FILE) {
+        if (preallocated.size() == 0) {
+            std::vector<extent_protocol::extentid_t> vec;
+            st = cl->call(extent_protocol::create_n_file, PRE_CREATE_NUM, vec);
+            VERIFY(st == extent_protocol::OK);
+            preallocated = vec;
+            LOG("pre created %u files\n", preallocated.size());
+        }
+        eid = preallocated.back();
+        preallocated.pop_back();
+    } else
+        st = extent_client::create(type, eid);  // RPC: get an id
     LOG("CREATE type %u id %llu\n", type, eid);
     // create in cache
     VERIFY(st == extent_protocol::OK);
@@ -224,20 +237,13 @@ extent_protocol::status extent_client_cache::remove(
     return st;
 }
 
-extent_protocol::status extent_client_cache::fullget(
-    extent_protocol::extentid_t eid, std::string &buf) {
-    std::cout << "FULL GET";
-    cl->call(extent_protocol::fullget, eid, buf);
-    std::cout << buf << std::endl;
-    return extent_protocol::OK;
-}
-
 extent_protocol::status extent_client_cache::flush(
     extent_protocol::extentid_t eid) {
     extent_protocol::status st = extent_protocol::OK;
     auto file = lookup(eid);
     if (file) {
         if (file->dataDirty) {
+            // return st;
             extent_client::put(eid, file->data);
             LOG("FLUSH: %llu put\n", eid);
         }

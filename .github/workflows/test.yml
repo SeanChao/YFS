@@ -17,6 +17,7 @@ jobs:
         continue-on-error: true
         run: ./grade_lab2.sh
       - name: special test for lab2-part1-b
+        continue-on-error: true
         run: ./start.sh && ./test-lab2-part1-b.pl ./yfs1; ./stop.sh
       - name: Test YDB
         continue-on-error: true

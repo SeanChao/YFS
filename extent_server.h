@@ -24,11 +24,15 @@ class extent_server {
     extent_server();
 
     int create(uint32_t type, extent_protocol::extentid_t &id);
+    int create_n_file(int n, std::vector<extent_protocol::extentid_t> &vec);
     int put(extent_protocol::extentid_t id, std::string, int &);
     int get(extent_protocol::extentid_t id, std::string &);
     int getattr(extent_protocol::extentid_t id, extent_protocol::attr &);
     int remove(extent_protocol::extentid_t id, int &);
-    int fullget(extent_protocol::extentid_t id, std::string &buf);
+
+   private:
+    // only preallocate FILE inodes, NOT DIR/LINK
+    std::vector<extent_protocol::extentid_t> preallocated;
 };
 
 #endif
