@@ -10,7 +10,7 @@ jobs:
       - name: Setup
         run: |
           sudo apt-get install libfuse-dev
-          git clone https://github.com/sslab-gatech/fxmark.git && cd fxmark && make -j
+          cd fxmark && make -j
       - name: Build
         run: make -j
       - name: Benchmark YFS performance

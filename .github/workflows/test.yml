@@ -8,11 +8,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Setup
-        run: |
-          sudo apt-get install libfuse-dev
-          git clone https://github.com/sslab-gatech/fxmark.git && cd fxmark && make -j
+        run: sudo apt-get install libfuse-dev
       - name: Build
-        run: make -j lab lab3
+        run: make -j
       - name: Test YFS
         continue-on-error: true
         run: ./grade_lab2.sh
@@ -21,6 +19,3 @@ jobs:
         run: ./start.sh && ./test-lab2-part1-b.pl ./yfs1; ./stop.sh \
           cat yfs_client1.log
           cat extent_server.log
-      - name: Test YDB
-        continue-on-error: true
-        run: make lab3 && ./grade_lab3.sh

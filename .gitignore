@@ -12,7 +12,6 @@ extent_server
 lock_server
 lock_tester
 yfs_client
-fxmark/
 
 part1_tester
 yfs_client
