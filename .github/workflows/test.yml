@@ -18,10 +18,9 @@ jobs:
         run: ./grade_lab2.sh
       - name: special test for lab2-part1-b
         continue-on-error: true
-        run: ./start.sh && ./test-lab2-part1-b.pl ./yfs1; ./stop.sh
+        run: ./start.sh && ./test-lab2-part1-b.pl ./yfs1; ./stop.sh \
+          cat yfs_client1.log
+          cat extent_server.log
       - name: Test YDB
         continue-on-error: true
         run: make lab3 && ./grade_lab3.sh
-      - name: Benchmark YFS performance
-        continue-on-error: true
-        run: ./stop.sh; ./start.sh && ./fxmark/bin/fxmark --type=YFS --root=./yfs1 --ncore=1 --duration=1; ./stop.sh

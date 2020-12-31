@@ -1,0 +1,18 @@
+name: Benchmark
+
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup
+        run: |
+          sudo apt-get install libfuse-dev
+          git clone https://github.com/sslab-gatech/fxmark.git && cd fxmark && make -j
+      - name: Build
+        run: make -j
+      - name: Benchmark YFS performance
+        continue-on-error: true
+        run: ./start.sh && ./fxmark/bin/fxmark --type=YFS --root=./yfs1 --ncore=1 --duration=1; ./stop.sh

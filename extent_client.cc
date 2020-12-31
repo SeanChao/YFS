@@ -55,7 +55,7 @@ extent_protocol::status extent_client::getattr(extent_protocol::extentid_t eid,
 }
 
 extent_protocol::status extent_client::put(extent_protocol::extentid_t eid,
-                                           std::string buf) {
+                                           std::string &buf) {
     extent_protocol::status ret = extent_protocol::OK;
     int r;
     ret = cl->call(extent_protocol::put, eid, buf, r);
@@ -200,7 +200,7 @@ extent_protocol::status extent_client_cache::getattr(
 }
 
 extent_protocol::status extent_client_cache::put(
-    extent_protocol::extentid_t eid, std::string buf) {
+    extent_protocol::extentid_t eid, std::string &buf) {
     extent_protocol::status st = extent_protocol::OK;
     auto file = lookup(eid);
     if (file && file->dataValid) {

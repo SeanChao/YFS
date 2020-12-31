@@ -26,11 +26,12 @@ yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
 #else
     lc = new lock_client(lock_dst);
 #endif
-    lc->acquire(rootId);
     std::string rootContent;
+    lc->acquire(rootId);
     ec->get(rootId, rootContent);
     // Concurrency: init only if root is not initialized
-    if (rootContent == "" && ec->put(rootId, "") != extent_protocol::OK)
+    std::string empty = "";
+    if (rootContent == "" && ec->put(rootId, empty) != extent_protocol::OK)
         printf("error init root dir\n");  // XYB: init root dir
     releaseLock(rootId);
 }
@@ -134,7 +135,8 @@ int yfs_client::setattr(inum_t ino, size_t size) {
     std::string buf;
     ec->get(ino, buf);
     if (size < oldsize) {
-        r = ec->put(ino, buf.substr(0, size));
+        std::string sub = buf.substr(0, size);
+        r = ec->put(ino, sub);
     } else {
         r = ec->put(ino, buf.append(std::string(size - oldsize, '\0')));
     }
@@ -346,13 +348,13 @@ int yfs_client::write(inum_t ino, size_t size, off_t off, const char *data,
         buf.replace(off, size, new_data.substr(0, size));
         bytes_written = size;
     }
-    // setattr(ino, buf.size());
     r = ec->put(ino, buf);
     // std::cout << bytes_written << " bytes written, now size " << buf.size()
     //           << " r=" << r << "\n";
     //   << " updated:\n";
     //   << buf << "|||\n";
     releaseLock(ino);
+    VERIFY(r == extent_protocol::OK);
     return r;
 }
 
