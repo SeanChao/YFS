@@ -140,7 +140,10 @@ extent_protocol::status extent_client_cache::create(
             st = cl->call(extent_protocol::create_n_file, PRE_CREATE_NUM, vec);
             VERIFY(st == extent_protocol::OK);
             preallocated = vec;
-            LOG("pre created %u files\n", preallocated.size());
+        }
+        if (preallocated.size() == 0) {
+            std::cerr << "Error: inode used up\n";
+            return extent_protocol::IOERR;
         }
         eid = preallocated.back();
         preallocated.pop_back();
@@ -202,6 +205,7 @@ extent_protocol::status extent_client_cache::getattr(
 extent_protocol::status extent_client_cache::put(
     extent_protocol::extentid_t eid, std::string &buf) {
     extent_protocol::status st = extent_protocol::OK;
+    LOG("PUT %s\n", buf);
     auto file = lookup(eid);
     if (file && file->dataValid) {
         file->data = buf;
@@ -243,9 +247,8 @@ extent_protocol::status extent_client_cache::flush(
     auto file = lookup(eid);
     if (file) {
         if (file->dataDirty) {
-            // return st;
             extent_client::put(eid, file->data);
-            LOG("FLUSH: %llu put\n", eid);
+            LOG("FLUSH: %llu put %s\n", eid, file->data.c_str());
         }
         if (file->remove) {
             extent_client::remove(eid);

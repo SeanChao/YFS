@@ -15,6 +15,15 @@
 #define USE_EXTENT_CLIENT_CACHE 1
 #define USE_LOCK_CACHE          1
 
+// #define DEBUG 42
+#ifdef DEBUG
+#define LOG(f_, ...) printf((f_), __VA_ARGS__)
+#else
+#define LOG(f_, ...) \
+    do {             \
+    } while (0)
+#endif
+
 yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
 #ifdef USE_EXTENT_CLIENT_CACHE
     ec = new extent_client_cache(extent_dst);
@@ -22,7 +31,7 @@ yfs_client::yfs_client(std::string extent_dst, std::string lock_dst) {
     ec = new extent_client(extent_dst);
 #endif
 #ifdef USE_LOCK_CACHE
-    lc = new lock_client_cache(lock_dst);
+    lc = new lock_client_cache(lock_dst, NULL, this);
 #else
     lc = new lock_client(lock_dst);
 #endif
@@ -49,16 +58,25 @@ std::string yfs_client::filename(inum_t inum) {
     return ost.str();
 }
 
-uint32_t yfs_client::get_type(inum_t inum) const {
+uint32_t yfs_client::get_type(inum_t inum) {
+    lc->acquire(inum);
+    uint32_t ty = unlocked_get_type(inum);
+    releaseLock(inum);
+    return ty;
+}
+uint32_t yfs_client::unlocked_get_type(inum_t inum) const {
     extent_protocol::attr a;
     ec->getattr(inum, a);
     return a.type;
 }
 
 bool yfs_client::is_type(inum_t inum, extent_protocol::types type) const {
-    return get_type(inum) == type;
+    return unlocked_get_type(inum) == type;
 }
 
+/**
+ * Caller should acquire the lock before calling this function
+ */
 bool yfs_client::isfile(inum_t inum) {
     return is_type(inum, extent_protocol::T_FILE);
 }
@@ -72,39 +90,51 @@ bool yfs_client::is_symlink(inum_t inum) {
 }
 
 int yfs_client::getfile(inum_t inum, fileinfo &fin) {
-    int r = OK;
+    int r = yfs_client::OK;
 
-    // printf("[YC] getfile %016llx\n", inum);
+    lc->acquire(inum);
+    // LOG("[YC] getfile %llu\n", inum);
+    r = unlocked_getfile(inum, fin);
+    releaseLock(inum);
+
+    return r;
+}
+
+int yfs_client::unlocked_getfile(inum_t inum, fileinfo &fin) {
     extent_protocol::attr a;
+    LOG("[YC] getfile %016llx\n", inum);
+    int r = OK;
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
-        goto release;
+        return r;
     }
-
     fin.atime = a.atime;
     fin.mtime = a.mtime;
     fin.ctime = a.ctime;
     fin.size = a.size;
     // printf("getfile %016llx -> sz %llu\n", inum, fin.size);
-
-release:
     return r;
 }
-
-int yfs_client::getdir(inum_t inum, dirinfo &din) {
+int yfs_client::unlocked_getdir(inum_t inum, dirinfo &din) {
     int r = OK;
 
     // printf("getdir %016llx\n", inum);
     extent_protocol::attr a;
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
-        goto release;
+        return r;
     }
     din.atime = a.atime;
     din.mtime = a.mtime;
     din.ctime = a.ctime;
 
-release:
+    return r;
+}
+
+int yfs_client::getdir(inum_t inum, dirinfo &din) {
+    lc->acquire(inum);
+    int r = unlocked_getdir(inum, din);
+    releaseLock(inum);
     return r;
 }
 
@@ -155,9 +185,11 @@ int yfs_client::create(inum_t parent, const char *name, mode_t mode,
         std::cerr << "!ERR file exists" << std::endl;
         return EXIST;
     }
-    uint32_t type = get_type(parent);
-    if (type != extent_protocol::T_DIR && type != extent_protocol::T_SYMLINK)
+    uint32_t type =unlocked_get_type(parent);
+    if (type != extent_protocol::T_DIR && type != extent_protocol::T_SYMLINK) {
+        std::cerr << "parent is not dir or symlink\n";
         return IOERR;
+    }
     if (type == extent_protocol::T_SYMLINK) {
         std::string path;
         readlink(parent, path);
@@ -309,12 +341,12 @@ int yfs_client::read(inum_t ino, size_t size, off_t off, std::string &data) {
     lc->acquire(ino);
     r = ec->get(ino, buf);
     releaseLock(ino);
-    // std::cout << "\tget OK\n";
+    std::cout << "\tget OK: buf=" << buf << "\n";
     if (off >= (long)buf.size())
         data = "";
     else
         data = buf.substr(off, size);
-    // std::cout << "data read " << data.size() << " bytes:\n" << data << "<\n";
+    std::cout << "data read " << data.size() << " bytes:\n" << data << "<\n";
     return r;
 }
 
@@ -360,19 +392,20 @@ int yfs_client::write(inum_t ino, size_t size, off_t off, const char *data,
 
 int yfs_client::unlink(inum_t parent, const char *name) {
     lc->acquire(parent);
-    // std::cout << "[YC] [UNLINK] parent " << parent << " " << name << std::endl;
+    // std::cout << "[YC] [UNLINK] parent " << parent << " " << name <<
+    // std::endl;
     int r = OK;
 
     /*
      * remove the file using ec->remove,
      * and update the parent directory content.
      */
-    uint32_t type = get_type(parent);
+    uint32_t type = unlocked_get_type(parent);
     if (type == extent_protocol::T_SYMLINK) {
         std::string path = "";
         readlink(parent, path);
         path_to_inum(path, parent);
-        type = get_type(parent);
+        type = unlocked_get_type(parent);
     }
     if (type != extent_protocol::T_DIR) {
         std::cerr << "!!!PARENT is not a directory" << std::endl;
@@ -468,7 +501,10 @@ int yfs_client::readlink(inum_t ino, std::string &path) {
 }
 
 void yfs_client::releaseLock(inum_t lockId) {
-    // Consistency insurance: writeback data when lock is released
-    ec->flush(lockId);
     lc->release(lockId);
+}
+
+int yfs_client::onLockRevoke(unsigned long long lockId) {
+    ec->flush(lockId);
+    return 0;
 }

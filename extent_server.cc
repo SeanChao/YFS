@@ -26,12 +26,14 @@ int extent_server::create(uint32_t type, extent_protocol::extentid_t &id) {
 
 int extent_server::create_n_file(
     int n, std::vector<extent_protocol::extentid_t> &vec) {
+    size_t act_len =0; 
     if (preallocated.size() < (size_t)(n)) {
         auto newVec = im->alloc_ninode(extent_protocol::T_FILE, 2 * n);
+        act_len = newVec.size();
         preallocated.insert(preallocated.end(), newVec.begin(), newVec.end());
     }
-    vec.insert(vec.begin(), preallocated.end() - n, preallocated.end());
-    preallocated.erase(preallocated.end() - n, preallocated.end());
+    vec.insert(vec.begin(), preallocated.end() - act_len, preallocated.end());
+    preallocated.erase(preallocated.end() - act_len, preallocated.end());
     return extent_protocol::OK;
 }
 

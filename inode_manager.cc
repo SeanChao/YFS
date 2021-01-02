@@ -197,7 +197,7 @@ std::vector<extent_protocol::extentid_t> inode_manager::alloc_ninode(
             inumArray.push_back(i);
         }
     }
-    printf("!!! Failed to allocate an inode\n");
+    // printf("!!! Failed to allocate an inode\n");
     pthread_mutex_unlock(&lock);
     return inumArray;
 }
@@ -432,7 +432,7 @@ void inode_manager::remove_file(uint32_t inum) {
         }
     }
     // reset metadata
-    ino->type = 0;
+    ino->type = 0;  // mark as deleted
     ino->size = 0;
     std::time_t time = std::time(NULL);
     ino->mtime = time;

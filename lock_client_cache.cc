@@ -11,6 +11,7 @@
 
 #include "rpc.h"
 #include "tprintf.h"
+#include "yfs_client.h"
 
 // #define DEBUG
 #ifdef DEBUG
@@ -33,8 +34,8 @@ const char *tellme(std::string id, pthread_t tid) {
 int lock_client_cache::last_port = 0;
 
 lock_client_cache::lock_client_cache(std::string xdst,
-                                     class lock_release_user *_lu)
-    : lock_client(xdst), lu(_lu) {
+                                     class lock_release_user *_lu, yfs_client* yfs_master)
+    : lock_client(xdst), lu(_lu), yfs_master(yfs_master) {
     srand(time(NULL) ^ last_port);
     rlock_port = ((rand() % 32000) | (0x1 << 10));
     const char *hname;
@@ -130,11 +131,12 @@ lock_protocol::status lock_client_cache::release(lock_protocol::lockid_t lid) {
     }
     // tprintf("%s release loc [%llu] (revoked: %d\n", TID, lid, revoke_recv[lid]);
     if (revoke_recv[lid]) {
-        // return the lock back to server
+        // Having received a revoke, return the lock back to server
         // tprintf("%s %llu return back to server\n", TID, lid);
         lock_state[lid] = NONE;
         revoke_recv[lid] = false;
         pthread_mutex_unlock(&mutex);
+        this->yfs_master->onLockRevoke(lid);
         int r;  // no use
         ret = cl->call(lock_protocol::release, lid, id, r);
         pthread_mutex_lock(&mutex);
@@ -151,10 +153,10 @@ rlock_protocol::status lock_client_cache::revoke_handler(
     lock_protocol::lockid_t lid, int &) {
     int ret = rlock_protocol::OK;
     pthread_mutex_lock(&mutex);
-    tprintf("%s <- revoke %llu\n", TID, lid);
+    // tprintf("%s <- revoke %llu\n", TID, lid);
     revoke_recv[lid] = true;
     if (lock_state[lid] == FREE) {
-        tprintf("%s revoke -> release\n", TID);
+        // tprintf("%s revoke -> release\n", TID);
         pthread_mutex_unlock(&mutex);
         release(lid);
         pthread_mutex_lock(&mutex);

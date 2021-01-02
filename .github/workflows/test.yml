@@ -16,6 +16,8 @@ jobs:
         run: ./grade_lab2.sh
       - name: special test for lab2-part1-b
         continue-on-error: true
-        run: ./start.sh && ./test-lab2-part1-b.pl ./yfs1; ./stop.sh \
+        shell: bash {0}
+        run: |
+          ./start.sh && ./test-lab2-part1-b.pl ./yfs1; ./stop.sh \
           cat yfs_client1.log
           cat extent_server.log

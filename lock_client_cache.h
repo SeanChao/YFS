@@ -5,7 +5,7 @@
 #define lock_client_cache_h
 
 #include <string>
-#include "pthread.h"
+#include <pthread.h>
 #include <unordered_map>
 
 #include "lang/verify.h"
@@ -23,10 +23,11 @@ class lock_release_user {
 };
 
 typedef lock_protocol::lockid_t lid_t;
-
+class yfs_client;
 class lock_client_cache : public lock_client {
    public:
     class lock_release_user *lu;
+    yfs_client *yfs_master;
     int rlock_port;
     std::string hostname;
     std::string id;
@@ -39,9 +40,8 @@ class lock_client_cache : public lock_client {
     std::map<lid_t, bool> revoke_recv;  // if the lock had received revoke
     // std::string last_locked;
 
-   public:
     static int last_port;
-    lock_client_cache(std::string xdst, class lock_release_user *l = 0);
+    lock_client_cache(std::string xdst, class lock_release_user *l = 0,  yfs_client* yfs_master = 0);
     virtual ~lock_client_cache(){};
     lock_protocol::status acquire(lock_protocol::lockid_t);
     lock_protocol::status release(lock_protocol::lockid_t);

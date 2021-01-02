@@ -15,7 +15,7 @@
 lock_server_cache::lock_server_cache() {
     rpc = new handle("");
     pthread_mutex_init(&lock, NULL);
-    tprintf("* lock server started (cached)\n");
+    // tprintf("* lock server started (cached)\n");
 }
 
 lock_server_cache::~lock_server_cache() {

@@ -45,8 +45,8 @@ yfs_client::status getattr(yfs_client::inum_t inum, struct stat &st) {
     bzero(&st, sizeof(st));
 
     st.st_ino = inum;
-    // printf("getattr %016llx isfile: %d\n", inum, yfs->isfile(inum));
     uint32_t type = yfs->get_type(inum);
+    // printf("fuse getattr %016llx ty%u\n", inum, type);
     switch (type) {
         case extent_protocol::T_FILE: {
             yfs_client::fileinfo info;
@@ -178,7 +178,7 @@ void fuseserver_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off,
     // Change the above "#if 0" to "#if 1", and your code goes here
     int r;
     if ((r = yfs->read(ino, size, off, buf)) == yfs_client::OK) {
-        fuse_reply_buf(req, buf.data(), buf.size());
+        fuse_reply_buf(req, buf.c_str(), buf.size());
     } else {
         fuse_reply_err(req, ENOENT);
     }

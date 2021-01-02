@@ -2,14 +2,12 @@
 #define yfs_client_h
 
 #include <string>
-
-#include "lock_client.h"
-#include "lock_client_cache.h"
-#include "lock_protocol.h"
-//#include "yfs_protocol.h"
 #include <vector>
 
 #include "extent_client.h"
+#include "lock_client.h"
+#include "lock_client_cache.h"
+#include "lock_protocol.h"
 
 #define FNAME_SIZE     248
 #define INUM_SIZE      (sizeof(inum))
@@ -58,10 +56,13 @@ class yfs_client {
     bool isdir(inum_t);
     bool is_symlink(inum_t);
     bool is_type(inum_t, extent_protocol::types) const;
-    uint32_t get_type(inum_t inum) const;
+    uint32_t get_type(inum_t inum) ;
+    uint32_t unlocked_get_type(inum_t inum) const;
 
     int getfile(inum_t, fileinfo &);
+    int unlocked_getfile(inum_t, fileinfo &);
     int getdir(inum_t, dirinfo &);
+    int unlocked_getdir(inum_t, dirinfo &);
 
     int setattr(inum_t, size_t);
     int unlockedLookup(inum_t, const char *, bool &, inum_t &);
@@ -75,9 +76,15 @@ class yfs_client {
     int mkdir(inum_t, const char *, mode_t, inum_t &);
 
     /** you may need to add symbolic link related methods here.*/
-    int symlink(const char *link, inum_t ino, const char *name, inum_t &ino_out);
+    int symlink(const char *link, inum_t ino, const char *name,
+                inum_t &ino_out);
     // readlink returns the path of symlink whose inode number is ino
     int readlink(inum_t ino, std::string &path);
+
+    /**
+     * Communication Link
+     */
+    int onLockRevoke(unsigned long long lid);
 };
 
 #endif
